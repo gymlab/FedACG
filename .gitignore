@@ -4,4 +4,7 @@ wandb
 checkpoints/**
 */.ipynb_checkpoints/
 __pycache__/
-
+data
+data/*
+outputs
+outputs/

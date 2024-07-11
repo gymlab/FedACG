@@ -69,7 +69,6 @@ class ServerM(Server):
             for param_key in local_deltas:
                 self.global_delta[param_key] = sum(local_deltas[param_key])/C
                 self.global_momentum[param_key] = self.args.server.momentum * self.global_momentum[param_key] + self.global_delta[param_key]
-            
 
         return local_weights
 
