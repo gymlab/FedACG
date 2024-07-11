@@ -35,7 +35,7 @@ split:
   class_per_client: 0 # only for skew mode
   unbalanced: False
   overlap_ratio: 0.0
-  create_client_dataset: False
+  create_client_dataset: Falsemit
 
 #################### Optimizer ####################
 optimizer:
