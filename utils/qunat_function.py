@@ -44,14 +44,14 @@ class WSQConv2d(nn.Conv2d):
         
     def forward(self, x):
         with torch.no_grad():
+            o = x.size(1) * x.size(2) * x.size(3)
             x_mean = x.mean(dim=1, keepdim=True).mean(dim=2, keepdim=True).mean(dim=3, keepdim=True)
             x = x - x_mean
-            x_std = x.view(x.size(0), -1).std(dim=1).view(-1, 1, 1, 1) + 1e-5
+            x_std = x.view(x.size(0), -1).std(dim=1).view(-1, 1, 1, 1) + 1e-8
             x = x / x_std.expand_as(x)
 
-            flat_x = x.view(-1)
-            indices = torch.bucketize(flat_x, self.edges, right=False)
-            quantized_x = self.q_values[indices].view(x.size())
+            indices = torch.bucketize(x, self.edges, right=False)
+            quantized_x = self.q_values[indices]
             quantized_x = quantized_x * x_std + x_mean
         return quantized_x
         
