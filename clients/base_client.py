@@ -172,8 +172,6 @@ class Client():
 
         self.model.to('cpu')
         self.global_model.to('cpu')
-        torch.cuda.empty_cache()
-        gc.collect()
         
         # Quantization
         if self.args.quantizer.uplink:
@@ -195,7 +193,8 @@ class Client():
                 fixed_params = {n:p for n,p in self.global_model.named_parameters()}
                 for n, p in self.model.named_parameters():
                     self.local_deltas[self.user][n] = (self.local_delta[n] - self.args.client.Dyn.alpha * (p - fixed_params[n]).detach().clone().to('cpu'))
-            del fixed_params      
+    
+        gc.collect()     
 
         return self.model.state_dict(), loss_dict
 
@@ -248,7 +247,7 @@ class Client():
             not_true_logits = results['logit'][not_true_idx].view(batch_size, results['logit'].size(1) - 1)
             not_true_logits_global = global_results['logit'][not_true_idx].view(batch_size, results['logit'].size(1) - 1)
             losses["NTD"] = KD(not_true_logits_global, not_true_logits, T=self.args.client.NTD.Temp)
-            del global_results, not_true_idx, not_true_logits, not_true_logits_global
+            del global_results
 
         #FedDyn
         if self.args.client.get('Dyn'):
@@ -261,6 +260,5 @@ class Client():
             losses["Dyn"] = - lg_loss + 0.5 * self.args.client.Dyn.alpha * prox_loss
             
         del results
-        torch.cuda.empty_cache()
-        gc.collect()
+
         return losses
