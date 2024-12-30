@@ -173,12 +173,12 @@ class Client():
         self.model.to('cpu')
         self.global_model.to('cpu')
         
-        # AQD
+        # Quantization
         if self.args.quantizer.uplink:
             if self.args.quantizer.name == "AQD":
                 AQD_update(self.model, self.args)
             elif self.args.quantizer.name == "WSQ":
-                WSQ_update(self.model, self.args)
+                WSQ_update(self.model, self.global_model, self.args)
             elif self.args.quantizer.name == "PAQ":
                 PAQ_update(self.model, self.global_model, self.args)
             elif self.args.quantizer.name == "WLQ":
