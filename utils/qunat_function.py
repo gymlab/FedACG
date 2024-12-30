@@ -217,22 +217,23 @@ def quantize_and_dequantize(tensor, global_tensor, bit_width, lr=1.0):
     if norm < 1e-12:
         return torch.zeros_like(residual_flatten), torch.zeros_like(residual), global_tensor.clone()
     
-    levels = 2 ** (bit_width - 1)
-    abs_ratio = torch.abs(residual_flatten) / norm
-    scaled_ratio = torch.clamp(abs_ratio * (levels - 1), 0, levels - 1)
-    lower_index = torch.floor(scaled_ratio).long()
-    upper_index = torch.clamp(lower_index + 1, 0, levels - 1)
-    p_upper = scaled_ratio - lower_index
-    random_values = torch.rand_like(abs_ratio)
-    selected_index = torch.where(random_values < p_upper, upper_index, lower_index)
-    quantized_values = torch.arange(0, levels) / (levels - 1)
-    selected_levels = quantized_values[selected_index]
-    quantized_flatten = norm * torch.sign(residual_flatten) * selected_levels
-    dequantized_flatten = quantized_flatten
+    if bit_width == 1:
+        quantized_flatten = norm * torch.sign(residual_flatten)
     
-    # dequantized_flatten = norm * torch.sign(residual_flatten) * (selected_levels / levels)
+    else:
+        levels = 2 ** (bit_width - 1)
+        abs_ratio = torch.abs(residual_flatten) / norm
+        scaled_ratio = torch.clamp(abs_ratio * (levels - 1), 0, levels - 1)
+        lower_index = torch.floor(scaled_ratio).long()
+        upper_index = torch.clamp(lower_index + 1, 0, levels - 1)
+        p_upper = scaled_ratio - lower_index
+        random_values = torch.rand_like(abs_ratio)
+        selected_index = torch.where(random_values < p_upper, upper_index, lower_index)
+        quantized_values = torch.arange(0, levels) / (levels - 1)
+        selected_levels = quantized_values[selected_index]
+        quantized_flatten = norm * torch.sign(residual_flatten) * selected_levels
 
-    dequantized_tensor = dequantized_flatten.view(original_shape)
+    dequantized_tensor = quantized_flatten.view(original_shape)
     
     updated_global_tensor = global_tensor + lr * dequantized_tensor # lr 어떻게 설정할지.. 일단 1로
 
