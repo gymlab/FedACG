@@ -5,7 +5,7 @@ if [ ${DATASET} = "tinyimagenet" ];then
     BATCH_SIZE=100
 fi 
 ALPHA=0.3
-NBITS=2
+NBITS=4
 
 python3 federated_train.py client=base server=base visible_devices=\'1\' exp_name=FedAvgWSAQD_"$ALPHA"_"B$NBITS" \
 dataset=${DATASET} trainer.num_clients=100 split.alpha=${ALPHA} trainer.participation_rate=0.05 \
