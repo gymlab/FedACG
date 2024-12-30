@@ -172,8 +172,6 @@ class Client():
 
         self.model.to('cpu')
         self.global_model.to('cpu')
-        torch.cuda.empty_cache()
-        gc.collect()
         
         # AQD
         if self.args.quantizer.uplink:
@@ -195,7 +193,7 @@ class Client():
                 fixed_params = {n:p for n,p in self.global_model.named_parameters()}
                 for n, p in self.model.named_parameters():
                     self.local_deltas[self.user][n] = (self.local_delta[n] - self.args.client.Dyn.alpha * (p - fixed_params[n]).detach().clone().to('cpu'))
-            del fixed_params      
+        gc.collect()     
 
         return self.model.state_dict(), loss_dict
 
@@ -261,6 +259,5 @@ class Client():
             losses["Dyn"] = - lg_loss + 0.5 * self.args.client.Dyn.alpha * prox_loss
             
         del results
-        torch.cuda.empty_cache()
-        gc.collect()
+        
         return losses
