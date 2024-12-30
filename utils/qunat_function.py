@@ -163,12 +163,13 @@ def quantize_and_dequantize(tensor, global_tensor, bit_width, lr=1.0):
     selected_index = torch.where(random_values < p_upper, upper_index, lower_index)
     quantized_values = torch.arange(0, levels) / (levels - 1)
     selected_levels = quantized_values[selected_index]
-    quantized_flatten = norm * torch.sign(residual_flatten) * selected_levels
-    dequantized_flatten = quantized_flatten
     
-    # dequantized_flatten = norm * torch.sign(residual_flatten) * (selected_levels / levels)
+    if bit_width == 1:
+        quantized_flatten = norm * torch.sign(residual_flatten)
+    else:
+        quantized_flatten = norm * torch.sign(residual_flatten) * selected_levels
 
-    dequantized_tensor = dequantized_flatten.view(original_shape)
+    dequantized_tensor = quantized_flatten.view(original_shape)
     
     updated_global_tensor = global_tensor + lr * dequantized_tensor # lr 어떻게 설정할지.. 일단 1로
 

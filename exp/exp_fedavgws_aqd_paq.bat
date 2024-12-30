@@ -13,7 +13,7 @@ if "%DATASET%" == "tinyimagenet" (
 set ALPHA=0.3
 set PARTICIPATION_RATE=0.05
 set WT_BIT=1
-set QUANTIZERS=PAQ AQD
+set QUANTIZERS=PAQ
 
 for %%Q in (%QUANTIZERS%) do (
     echo Running experiment with quantizer: %%Q
