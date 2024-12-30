@@ -9,7 +9,6 @@ import torch.nn.functional as F
 from torch.nn.modules.utils import _quadruple
 
 if sys.version_info[0] == 3:
-    from . import alqnet as alqnet
     from . import dorefa as dorefa
     from . import xnor as xnor
 
@@ -159,52 +158,6 @@ class quantization(nn.Module):
         # for LQ-Net
         # print(f'init_id {id(self.args)}')
         
-        if 'lq' in self.args.quantizer.keyword or 'alq' in self.args.quantizer.keyword or 'popcount' in self.args.quantizer.keyword:
-            if not hasattr(self, 'num_levels'):
-                self.num_levels = 2**self.bit
-            if self.num_levels > 256:
-                raise RuntimeError("currently not support more than 8 bit quantization")
-            if self.num_levels == 3:
-                self.bit = 1
-                self.logger.info('update %s_bit %r' % (self.tag, self.bit))
-
-            self.method = 'lqnet'
-            if 'lq' in self.args.quantizer.keyword:
-                self.choice = 'lqnet'
-            elif 'alq' in self.args.quantizer.keyword:
-                self.choice = 'alqnet'
-            elif 'popcount' in self.args.quantizer.keyword:
-                self.choice = 'popcount'
-
-            if 'lq' in self.args.quantizer.keyword:
-                self.lq_net_init()
-                self.quant_fm = alqnet.LqNet_fm
-                self.quant_wt = alqnet.LqNet_wt
-
-            # initialize rould threshold
-            init_thrs_multiplier = []
-            for i in range(1, self.num_levels):
-                thrs_multiplier_i = [0. for j in range(self.num_levels)]
-                if not self.half_range:
-                    if i < self.num_levels/2:
-                        thrs_multiplier_i[i - 1] = 1 - self.scale
-                        thrs_multiplier_i[i] = self.scale
-                    elif i > self.num_levels/2:
-                        thrs_multiplier_i[i - 1] = self.scale
-                        thrs_multiplier_i[i] = 1 - self.scale
-                    else:
-                        thrs_multiplier_i[i - 1] = 0.5
-                        thrs_multiplier_i[i] = 0.5
-                else:
-                    thrs_multiplier_i[i - 1] = self.scale
-                    thrs_multiplier_i[i] = 1 - self.scale
-                init_thrs_multiplier.append(thrs_multiplier_i)
-
-            self.thrs_multiplier = nn.Parameter(torch.zeros(self.num_levels - 1, self.num_levels), requires_grad=False)
-            self.thrs_multiplier.data = torch.FloatTensor(init_thrs_multiplier)
-            if 'debug' in self.args.quantizer.keyword:
-                self.logger.info('self.thrs_multiplier: {}'.format(self.thrs_multiplier))
-
         if 'dorefa' in self.args.quantizer.keyword or 'pact' in self.args.quantizer.keyword:
             # print(f'IN dorefa ID {id(self.args)}')
             self.method = 'dorefa'
@@ -535,18 +488,6 @@ class quantization(nn.Module):
                 return y
             else:
                 self.logger.warning("Integer only computation for layer {} - repeat mark {} might not supported.".format(self.index, self.repeat_mark))
-
-        if self.method == 'lqnet':
-            if self.tag == 'fm':
-                y, basis = self.quant_fm.apply(x, self.basis, self.codec_vector, self.codec_index, self.thrs_multiplier, \
-                        self.training, self.half_range, self.auxil, self.adaptive)
-            else:
-                y, basis = self.quant_wt.apply(x, self.basis, self.codec_vector, self.codec_index, self.thrs_multiplier, \
-                        self.training, self.half_range, self.auxil, self.adaptive)
-
-            self.update_bias(basis)
-
-            return self.quantization_value(x, y)
 
         if 'xnor' in self.args.quantizer.keyword:
             if self.tag == 'fm':
