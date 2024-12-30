@@ -139,19 +139,21 @@ class WSQConv2d(nn.Module):
         return updated_global_x
 
 
-def WSQ_update(model, args):
+def WSQ_update(model, global_model, args):
+    
+    g_params = dict(global_model.named_parameters())
     
     for name, param in model.named_parameters():
         if hasattr(args.quantizer, 'keyword'):
             if 'first-last' in args.quantizer.keyword and name == 'conv1.weight':
                 first_quant_conv = WSQConv2d(n_bits=args.quantizer.wt_bit, clip_prob=args.quantizer.wt_clip_prob)
-                param.data.copy_(first_quant_conv(param.data)) 
+                param.data.copy_(first_quant_conv(param.data, g_params[name].data)) 
             elif name != "conv1.weight" and ("conv1.weight" in name or "conv2.weight" in name):
                 layer_quant_conv = WSQConv2d(n_bits=args.quantizer.wt_bit, clip_prob=args.quantizer.wt_clip_prob)
-                param.data.copy_(layer_quant_conv(param.data))
+                param.data.copy_(layer_quant_conv(param.data, g_params[name].data)) 
             elif "downsample.0.weight" in name:
                 quant_conv1x1 = WSQConv2d(n_bits=args.quantizer.wt_bit, clip_prob=args.quantizer.wt_clip_prob)
-                param.data.copy_(quant_conv1x1(param.data))
+                param.data.copy_(quant_conv1x1(param.data, g_params[name].data)) 
 
                 
 class WLQConv2d(nn.Conv2d):
