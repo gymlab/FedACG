@@ -153,7 +153,7 @@ def quantize_and_dequantize(tensor, global_tensor, bit_width, lr=1.0):
     if norm < 1e-12:
         return torch.zeros_like(residual_flatten), torch.zeros_like(residual), global_tensor.clone()
     
-    levels = 2 ** bit_width
+    levels = 2 ** (bit_width - 1)
     abs_ratio = torch.abs(residual_flatten) / norm
     scaled_ratio = torch.clamp(abs_ratio * (levels - 1), 0, levels - 1)
     lower_index = torch.floor(scaled_ratio).long()
@@ -164,7 +164,7 @@ def quantize_and_dequantize(tensor, global_tensor, bit_width, lr=1.0):
     quantized_values = torch.arange(0, levels) / (levels - 1)
     selected_levels = quantized_values[selected_index]
     quantized_flatten = norm * torch.sign(residual_flatten) * selected_levels
-    dequantized_flatten = quantized_flatten 
+    dequantized_flatten = quantized_flatten
     
     # dequantized_flatten = norm * torch.sign(residual_flatten) * (selected_levels / levels)
 
