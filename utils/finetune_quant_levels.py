@@ -42,9 +42,9 @@ def refined_search(selected_alpha, refined_step, max_value, refinement_range=0.0
     print(f"Selected | Alpha: {selected_alpha} | Min Err.: {min_val}")
 
 # Example usage
-selected_alpha = (0.05, 0.1, 0.20417, 0.3375, 0.52917, 0.99583, 1.39583, 1.4625)
-refined_step = 0.001  # Step size for refined search
+selected_alpha = (0.0498, 0.0991, 0.203, 0.3355, 0.528, 0.9925, 1.3935, 1.4585)
+refined_step = 0.0001  # Step size for refined search
 max_value = 1.8  # Maximum value for alpha
-refinement_range = 0.0375/9  # Range around found alpha values for refinement
+refinement_range = 0.0002  # Range around found alpha values for refinement
 
 refined_search(selected_alpha, refined_step, max_value, refinement_range)
