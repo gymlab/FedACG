@@ -228,7 +228,7 @@ def quantize_and_dequantize(tensor, global_tensor, bit_width, lr=1.0):
     p_upper = scaled_ratio - lower_index
     random_values = torch.rand_like(abs_ratio)
     selected_index = torch.where(random_values < p_upper, upper_index, lower_index)
-    quantized_values = torch.arange(0, levels) / (levels)
+    quantized_values = torch.arange(0, levels + 1) / (levels)
     selected_levels = quantized_values[selected_index]
     quantized_flatten = norm * torch.sign(residual_flatten) * selected_levels
 

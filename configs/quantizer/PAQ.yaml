@@ -1,5 +1,5 @@
 name: "PAQ"
 uplink: True
 downlink: False
-wt_bit: 4
+wt_bit: 1
 keyword: []
