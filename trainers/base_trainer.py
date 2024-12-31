@@ -136,11 +136,16 @@ class Trainer():
             if self.args.client.get('Dyn'):
                 setup_inputs['past_local_deltas'] = self.past_local_deltas
                 setup_inputs['user'] = task['client_idx']
-
+            
             client.setup(**setup_inputs)
+            
             # Local Training
-            local_model, local_loss_dict = client.local_train(global_epoch=task['global_epoch'])
-            result_queue.put((local_model, local_loss_dict))
+            
+            local_model, local_loss_dict, max_error = client.local_train(global_epoch=task['global_epoch'])
+            if self.args.quantizer.name == "HQ":
+                result_queue.put((local_model, local_loss_dict, max_error))
+            else:
+                result_queue.put((local_model, local_loss_dict))
 
             if not self.args.multiprocessing:
                 break
@@ -191,6 +196,7 @@ class Trainer():
             local_weights = defaultdict(list)
             local_loss_dicts = defaultdict(list)
             local_deltas = defaultdict(list)
+            quantization_errors = []             
 
             # FedACG lookahead momentum
             if self.args.server.get('FedACG'):
@@ -213,14 +219,25 @@ class Trainer():
                     task_queue = mp.Queue()
                     task_queue.put(task_queue_input)
                     self.local_update(self.device, task_queue, result_queue)
-
-                    local_state_dict, local_loss_dict = result_queue.get()
+                    
+                    result = result_queue.get()
+                    if self.args.quantizer.name == "HQ":
+                        local_state_dict, local_loss_dict, max_error = result
+                        quantization_errors.append(max_error)
+                    else:
+                        local_state_dict, local_loss_dict = result
+                        
                     for loss_key in local_loss_dict:
                         local_loss_dicts[loss_key].append(local_loss_dict[loss_key])
 
                     for param_key in local_state_dict:
                         local_weights[param_key].append(local_state_dict[param_key])
                         local_deltas[param_key].append(local_state_dict[param_key] - global_state_dict[param_key])
+
+            if self.args.quantizer.name == "HQ":
+                client_pi = self.server.compute_pi(quantization_errors)
+            else:
+                client_pi = None
 
             if self.args.multiprocessing:
                 for _ in range(len(selected_client_ids)):
@@ -237,7 +254,7 @@ class Trainer():
             
             logger.info(f"Global epoch {epoch}, Train End. Total Time: {time.time() - start:.2f}s")
 
-            updated_global_state_dict = self.server.aggregate(local_weights, local_deltas,
+            updated_global_state_dict = self.server.aggregate(local_weights, local_deltas, client_pi,
                                                             selected_client_ids, copy.deepcopy(global_state_dict), current_lr, 
                                                             epoch=epoch if self.args.server.get('AnalizeServer') else None)
 

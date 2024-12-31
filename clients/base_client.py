@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 from clients.build import CLIENT_REGISTRY
 
-from utils.qunat_function import AQD_update , PAQ_update, WSQ_update, WLQ_update
+from utils.qunat_function import AQD_update , PAQ_update, WSQ_update, WLQ_update, HQ_update
 
 @CLIENT_REGISTRY.register()
 class Client():
@@ -174,6 +174,7 @@ class Client():
         self.global_model.to('cpu')
         
         # Quantization
+        max_error = 0
         if self.args.quantizer.uplink:
             if self.args.quantizer.name == "AQD":
                 AQD_update(self.model, self.args)
@@ -183,6 +184,8 @@ class Client():
                 PAQ_update(self.model, self.global_model, self.args)
             elif self.args.quantizer.name == "WLQ":
                 WLQ_update(self.model, self.args)
+            elif self.args.quantizer.name == "HQ":
+                self.model, max_error = HQ_update(self.model, self.global_model, self.args)
         
         loss_dict = {
             f'loss/{self.args.dataset.name}': loss_meter.avg,
@@ -195,8 +198,9 @@ class Client():
                     self.local_deltas[self.user][n] = (self.local_delta[n] - self.args.client.Dyn.alpha * (p - fixed_params[n]).detach().clone().to('cpu'))
     
         gc.collect()     
-
-        return self.model.state_dict(), loss_dict
+        
+        return self.model.state_dict(), loss_dict, max_error
+        # return self.model.state_dict(), loss_dict
 
     def _algorithm(self, images, labels, ) -> Dict:
         losses = defaultdict(float)

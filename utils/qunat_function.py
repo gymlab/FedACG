@@ -218,22 +218,18 @@ def quantize_and_dequantize(tensor, global_tensor, bit_width, lr=1.0):
     norm = torch.norm(residual_flatten)
     if norm < 1e-12:
         return torch.zeros_like(residual_flatten), torch.zeros_like(residual), global_tensor.clone()
-    
-    if bit_width == 1:
-        quantized_flatten = norm * torch.sign(residual_flatten)
-    
-    else:
-        levels = 2 ** (bit_width - 1)
-        abs_ratio = torch.abs(residual_flatten) / norm
-        scaled_ratio = torch.clamp(abs_ratio * (levels - 1), 0, levels - 1)
-        lower_index = torch.floor(scaled_ratio).long()
-        upper_index = torch.clamp(lower_index + 1, 0, levels - 1)
-        p_upper = scaled_ratio - lower_index
-        random_values = torch.rand_like(abs_ratio)
-        selected_index = torch.where(random_values < p_upper, upper_index, lower_index)
-        quantized_values = torch.arange(0, levels) / (levels - 1)
-        selected_levels = quantized_values[selected_index]
-        quantized_flatten = norm * torch.sign(residual_flatten) * selected_levels
+
+    levels = 2 ** (bit_width - 1)
+    abs_ratio = torch.abs(residual_flatten) / norm
+    scaled_ratio = torch.clamp(abs_ratio * (levels), 0, levels)
+    lower_index = torch.floor(scaled_ratio).long()
+    upper_index = torch.clamp(lower_index + 1, 0, levels)
+    p_upper = scaled_ratio - lower_index
+    random_values = torch.rand_like(abs_ratio)
+    selected_index = torch.where(random_values < p_upper, upper_index, lower_index)
+    quantized_values = torch.arange(0, levels) / (levels)
+    selected_levels = quantized_values[selected_index]
+    quantized_flatten = norm * torch.sign(residual_flatten) * selected_levels
 
     dequantized_tensor = quantized_flatten.view(original_shape)
     
@@ -270,3 +266,70 @@ def PAQ_update(model, global_model, args):
             # print(torch.sum(~(updated_local != g_params[name])).item())
 
     return model
+
+
+# 미완..
+def HQ_update(model, global_model, args):
+    s = args.quantizer.wt_bit
+
+    lr = getattr(args, 'global_lr', 1.0)
+
+    g_params = dict(global_model.named_parameters())
+    max_error = 0.0 
+
+    for name, param in model.named_parameters():
+        if 'first-last' in args.quantizer.keyword and name == 'conv1.weight':
+      
+            global_param = g_params[name]
+            q, dq, updated_local, quantization_error = quant_and_dequant(param.data, global_param.data, s, lr)
+            param.data.copy_(updated_local)
+
+        elif 'first-last' in args.quantizer.keyword and name == 'fc.weight':
+      
+            global_param = g_params[name]
+            q, dq, updated_local, quantization_error = quant_and_dequant(param.data, global_param.data, s, lr)
+            param.data.copy_(updated_local)
+
+        elif "conv" in name or "downsample.0.weight" in name:
+         
+            global_param = g_params[name]
+            q, dq, updated_local, quantization_error = quant_and_dequant(param.data, global_param.data, s, lr)
+            param.data.copy_(updated_local)
+            # print(torch.sum(~(updated_local != g_params[name])).item())
+
+        # Algoirhm 2 (line 9) : computes the instantaneous quantization error
+        max_error = max(max_error, quantization_error.item())
+
+    return model, max_error
+
+
+def quant_and_dequant(tensor, global_tensor, bit_width, lr=1.0, quantization_weight=1.0):
+    residual = tensor - global_tensor
+
+    # E(w) : formula (2) 계산
+    max_val = torch.max(torch.abs(residual))
+    exponent = torch.floor(torch.log2(max_val + 1e-6))
+    exponent = torch.clamp(exponent, -(2 ** (bit_width -1)), 2 ** (bit_width - 1) - 1)
+
+    theta = 2 ** (exponent + 2 - bit_width)
+
+    # Q(x) : formula (3) 계산
+    floor_val = torch.floor(residual / theta)
+    ceil_val = torch.ceil(residual / theta)
+    prob = (residual / theta) - floor_val
+    quantized = torch.where(torch.rand_like(prob) < prob, ceil_val, floor_val)
+    
+    lower_bound = -2 ** (exponent + 1)
+    upper_bound = 2** (exponent + 1) - 2 ** (exponent + 2 - bit_width)
+    quantized = torch.clamp(quantized, lower_bound, upper_bound)
+    
+    dequantized = quantized * theta
+    weighted_dequantized = dequantized * quantization_weight
+    updated_local = global_tensor + weighted_dequantized * lr
+
+    # qi(t)
+    numerator = torch.norm(dequantized - residual) ** 2
+    denominator = torch.norm(residual) ** 2
+    quantization_error = numerator / (denominator + 1e-8)
+
+    return quantized, dequantized, updated_local, quantization_error
