@@ -99,3 +99,62 @@ def WSQ_update(model, global_model, args):
             elif "downsample.0.weight" in name:
                 quant_conv1x1 = WSQConv2d(n_bits=args.quantizer.wt_bit, clip_prob=args.quantizer.wt_clip_prob)
                 param.data.copy_(quant_conv1x1(param.data, g_params[name].data)) 
+
+               
+def quantize_and_dequantize(tensor, global_tensor, bit_width, lr=1.0):
+    residual = tensor - global_tensor
+    original_shape = residual.shape
+    residual_flatten = residual.view(-1)
+    
+    norm = torch.norm(residual_flatten)
+    if norm < 1e-12:
+        return torch.zeros_like(residual_flatten), torch.zeros_like(residual), global_tensor.clone()
+    
+
+    levels = 2 ** (bit_width - 1)
+    abs_ratio = torch.abs(residual_flatten) / norm
+    scaled_ratio = torch.clamp(abs_ratio * (levels), 0, levels)
+    lower_index = torch.floor(scaled_ratio).long()
+    upper_index = torch.clamp(lower_index + 1, 0, levels)
+    p_upper = scaled_ratio - lower_index
+    random_values = torch.rand_like(abs_ratio)
+    selected_index = torch.where(random_values < p_upper, upper_index, lower_index)
+    quantized_values = torch.arange(0, levels + 1) / (levels)
+    selected_levels = quantized_values[selected_index]
+    quantized_flatten = norm * torch.sign(residual_flatten) * selected_levels
+
+    dequantized_tensor = quantized_flatten.view(original_shape)
+    
+    updated_global_tensor = global_tensor + lr * dequantized_tensor # lr 어떻게 설정할지.. 일단 1로
+
+    return quantized_flatten, dequantized_tensor, updated_global_tensor
+
+
+def PAQ_update(model, global_model, args):
+    s = args.quantizer.wt_bit
+
+    lr = getattr(args, 'global_PAQ_lr', 1.0)
+
+    g_params = dict(global_model.named_parameters())
+
+    for name, param in model.named_parameters():
+        if 'first-last' in args.quantizer.keyword and name == 'conv1.weight':
+      
+            global_param = g_params[name]
+            q, dq, updated_local = quantize_and_dequantize(param.data, global_param.data, s, lr)
+            param.data.copy_(updated_local)
+
+        elif 'first-last' in args.quantizer.keyword and name == 'fc.weight':
+      
+            global_param = g_params[name]
+            q, dq, updated_local = quantize_and_dequantize(param.data, global_param.data, s, lr)
+            param.data.copy_(updated_local)
+
+        elif "conv" in name or "downsample.0.weight" in name:
+         
+            global_param = g_params[name]
+            q, dq, updated_local = quantize_and_dequantize(param.data, global_param.data, s, lr)
+            param.data.copy_(updated_local)
+            # print(torch.sum(~(updated_local != g_params[name])).item())
+
+    return model
