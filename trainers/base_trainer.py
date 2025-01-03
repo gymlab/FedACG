@@ -36,7 +36,7 @@ from omegaconf import DictConfig,OmegaConf
 #from netcal.metrics import ECE
 import matplotlib.pyplot as plt
 
-from utils.qunat_function import AQD_update, WSQ_update
+from utils.qunat_function import AQD_update, WSQ_update, compute_p_i
 
 
 @TRAINER_REGISTRY.register()
@@ -68,6 +68,8 @@ class Trainer():
         trainer_args = self.args.trainer
         self.num_clients = trainer_args.num_clients
         self.participation_rate = trainer_args.participation_rate
+        self.client_errors = {client_id: 0.0 for client_id in range(self.num_clients)}
+        
         self.global_rounds = trainer_args.global_rounds
         self.lr = trainer_args.local_lr
         self.local_lr_decay = trainer_args.local_lr_decay
@@ -139,8 +141,11 @@ class Trainer():
 
             client.setup(**setup_inputs)
             # Local Training
-            local_model, local_loss_dict = client.local_train(global_epoch=task['global_epoch'])
+            
+            local_model, local_loss_dict , local_error = client.local_train(global_epoch=task['global_epoch'])
             result_queue.put((local_model, local_loss_dict))
+            
+            self.client_errors[task['client_idx']] = local_error
 
             if not self.args.multiprocessing:
                 break
@@ -235,6 +240,13 @@ class Trainer():
             
             logger.info(f"Global epoch {epoch}, Train End. Total Time: {time.time() - start:.2f}s")
 
+            if self.args.quantizer.name == 'HQ':
+                q_list = [self.client_errors[cid] for cid in selected_client_ids]
+                p_list = compute_p_i(q_list)  
+                for param_key in local_weights:
+                    for i, w_i in enumerate(local_weights[param_key]):
+                        local_weights[param_key][i] = p_list[i] * w_i * len(selected_client_ids)
+                        
             updated_global_state_dict = self.server.aggregate(local_weights, local_deltas,
                                                             selected_client_ids, copy.deepcopy(global_state_dict), current_lr, 
                                                             epoch=epoch if self.args.server.get('AnalizeServer') else None)
@@ -422,6 +434,7 @@ class CKATrainer(Trainer):
                 wandb.log({"CKA": np.mean(cka_mat)}, step=epoch)
                 logger.info(cka_mat)
 
+                
             # Server-side
             updated_global_state_dict = self.server.aggregate(local_weights, local_deltas,
                                                             selected_client_ids, copy.deepcopy(global_state_dict), current_lr, 

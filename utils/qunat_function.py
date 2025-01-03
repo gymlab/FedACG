@@ -1,6 +1,7 @@
 from models.quant import *
 from models.layers import norm
 from models.quant import quantization
+import copy
 
 def AQD_update(model, args):
 
@@ -136,25 +137,108 @@ def PAQ_update(model, global_model, args):
     lr = getattr(args, 'global_PAQ_lr', 1.0)
 
     g_params = dict(global_model.named_parameters())
-
+    
     for name, param in model.named_parameters():
-        if 'first-last' in args.quantizer.keyword and name == 'conv1.weight':
-      
-            global_param = g_params[name]
-            q, dq, updated_local = quantize_and_dequantize(param.data, global_param.data, s, lr)
-            param.data.copy_(updated_local)
-
-        elif 'first-last' in args.quantizer.keyword and name == 'fc.weight':
-      
-            global_param = g_params[name]
-            q, dq, updated_local = quantize_and_dequantize(param.data, global_param.data, s, lr)
-            param.data.copy_(updated_local)
-
-        elif "conv" in name or "downsample.0.weight" in name:
-         
-            global_param = g_params[name]
-            q, dq, updated_local = quantize_and_dequantize(param.data, global_param.data, s, lr)
-            param.data.copy_(updated_local)
-            # print(torch.sum(~(updated_local != g_params[name])).item())
-
+        if hasattr(args.quantizer, 'keyword'):
+            if 'first-last' in args.quantizer.keyword and name == 'conv1.weight':
+                global_param = g_params[name]
+                q, dq, updated_local = quantize_and_dequantize(param.data, global_param.data, s, lr)
+                param.data.copy_(updated_local)
+                
+            elif name != "conv1.weight" and ("conv1.weight" in name or "conv2.weight" in name):
+                global_param = g_params[name]
+                q, dq, updated_local = quantize_and_dequantize(param.data, global_param.data, s, lr)
+                param.data.copy_(updated_local)
+                
+            elif "downsample.0.weight" in name:
+                global_param = g_params[name]
+                q, dq, updated_local = quantize_and_dequantize(param.data, global_param.data, s, lr)
+                param.data.copy_(updated_local)
+            
+            elif 'first-last' in args.quantizer.keyword and name == 'fc.weight':
+                global_param = g_params[name]
+                q, dq, updated_local = quantize_and_dequantize(param.data, global_param.data, s, lr)
+                param.data.copy_(updated_local)
+                
     return model
+
+
+def compute_q_i(residual_model, after_residual_model):
+
+    max_ratio = 0.0 
+
+    for param_name in residual_model:
+        p_new = after_residual_model[param_name] 
+        p_orig = residual_model[param_name]       
+
+        orig_norm_sq = p_orig.pow(2).sum().item()
+        if orig_norm_sq == 0.0:
+
+            ratio = 0.0
+        else:
+            diff_norm_sq = (p_new - p_orig).pow(2).sum().item()
+            ratio = diff_norm_sq / orig_norm_sq
+
+        if ratio > max_ratio:
+            max_ratio = ratio
+
+    return max_ratio
+
+def compute_p_i(q_list):
+
+    inv_terms = [1.0 / (1.0 + q) for q in q_list] 
+    denom = sum(inv_terms)  
+    if denom == 0:
+        return [1.0 / len(q_list)] * len(q_list)
+    
+    p_list = [term / denom for term in inv_terms]
+    return p_list
+
+def compute_parameter_residuals(model, global_model):
+
+    residual_model = {}  
+
+    for (param_name, param), (param_name_global, param_global) in zip(model.named_parameters(), global_model.named_parameters()):
+   
+        residual = param - param_global
+        residual_model[param_name] = residual.clone()
+    
+    return residual_model
+
+
+def HQ_update(self, model, global_model, args):
+    s = args.quantizer.wt_bit
+
+    lr = 1.0
+
+    g_params = dict(global_model.named_parameters())
+
+    residual_model = compute_parameter_residuals(model, global_model)
+    
+    for name, param in model.named_parameters():
+        if hasattr(args.quantizer, 'keyword'):
+            if 'first-last' in args.quantizer.keyword and name == 'conv1.weight':
+                global_param = g_params[name]
+                q, dq, updated_local = quantize_and_dequantize(param.data, global_param.data, s, lr)
+                param.data.copy_(updated_local)
+                
+            elif name != "conv1.weight" and ("conv1.weight" in name or "conv2.weight" in name):
+                global_param = g_params[name]
+                q, dq, updated_local = quantize_and_dequantize(param.data, global_param.data, s, lr)
+                param.data.copy_(updated_local)
+                
+            elif "downsample.0.weight" in name:
+                global_param = g_params[name]
+                q, dq, updated_local = quantize_and_dequantize(param.data, global_param.data, s, lr)
+                param.data.copy_(updated_local)
+            
+            elif 'first-last' in args.quantizer.keyword and name == 'fc.weight':
+                global_param = g_params[name]
+                q, dq, updated_local = quantize_and_dequantize(param.data, global_param.data, s, lr)
+                param.data.copy_(updated_local)
+
+    after_resiudal_model = compute_parameter_residuals(model, global_model)
+    local_error = compute_q_i(residual_model, after_resiudal_model)
+    
+    return local_error
+
