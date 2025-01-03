@@ -2,6 +2,7 @@ from models.quant import *
 from models.layers import norm
 from models.quant import quantization
 import copy
+import copy
 
 def AQD_update(model, args):
 
@@ -26,6 +27,7 @@ class WSQConv2d(nn.Module):
     bit2 = [0.5288, 0.9816]
     bit3 = [0.4510, 0.7481, 0.9882]
     bit4 = [0.2960, 0.5567, 0.7088, 1.1286]
+    bit8 = [0.0498, 0.0991, 0.203, 0.3355, 0.5280, 0.9925, 1.3935, 1.4585]
     bit8 = [0.0498, 0.0991, 0.203, 0.3355, 0.5280, 0.9925, 1.3935, 1.4585]
 
     def __init__(self, n_bits=1, clip_prob=-1):
@@ -162,6 +164,7 @@ def PAQ_update(model, global_model, args):
     lr = getattr(args, 'global_PAQ_lr', 1.0)
 
     g_params = dict(global_model.named_parameters())
+    
     
     for name, param in model.named_parameters():
         if hasattr(args.quantizer, 'keyword'):
