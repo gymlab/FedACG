@@ -185,8 +185,6 @@ class Client():
                 PAQ_update(self.model, self.global_model, self.args)
             elif self.args.quantizer.name == "HQ":
                 local_error = HQ_update(self, self.model, self.global_model, self.args)
-            elif self.args.quantizer.name == "HQ":
-                local_error = HQ_update(self, self.model, self.global_model, self.args)
         
         loss_dict = {
             f'loss/{self.args.dataset.name}': loss_meter.avg,
@@ -200,7 +198,6 @@ class Client():
     
         gc.collect()     
 
-        return self.model.state_dict(), loss_dict, local_error
         return self.model.state_dict(), loss_dict, local_error
 
     def _algorithm(self, images, labels, ) -> Dict:
