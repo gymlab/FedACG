@@ -23,23 +23,11 @@ class Server():
         self.args = args
         return
     
-    def aggregate(self, local_weights, local_deltas, client_pi, client_ids, model_dict, current_lr, epoch=None):
+    def aggregate(self, local_weights, local_deltas, client_ids, model_dict, current_lr, epoch=None):
         C = len(client_ids)
-        if client_pi is None:
-            for param_key in local_weights:
-                local_weights[param_key] = sum(local_weights[param_key])/C
-            return local_weights
-        else:
-            for param_key in local_weights:
-                local_weights[param_key] = sum([client_pi[i]*local_weights[param_key][i] for i in range(C)])
-            return local_weights
-    
-    
-    def compute_pi(self, quantization_errors):
-        inverse_q = [1 / (1 + q) for q in quantization_errors]
-        sum_inverse_q = sum(inverse_q)
-        pi = [iq / sum_inverse_q for iq in inverse_q]
-        return pi
+        for param_key in local_weights:
+            local_weights[param_key] = sum(local_weights[param_key])/C
+        return local_weights
 
 @SERVER_REGISTRY.register()
 class AnalizeServer():

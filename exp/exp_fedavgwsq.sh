@@ -10,5 +10,5 @@ NBITS=4
 python3 federated_train.py client=base server=base visible_devices=\'1\' exp_name=FedAvgWSQInit_"$ALPHA"_"B$NBITS" \
 dataset=${DATASET} trainer.num_clients=100 split.alpha=${ALPHA} trainer.participation_rate=0.05 \
 quantizer=WSQ quantizer.wt_bit=${NBITS} \
-batch_size=${BATCH_SIZE} wandb=True model=resnet18_WS model.init_mode="kaiming_normal" project="dev_quant" \
+batch_size=${BATCH_SIZE} wandb=False model=resnet18_WS project="dev_quant" \
 # split.mode=iid
