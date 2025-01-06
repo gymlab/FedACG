@@ -1,6 +1,7 @@
 from models.quant import *
 from models.layers import norm
 from models.quant import quantization
+import copy
 
 def AQD_update(model, args):
 
@@ -25,6 +26,8 @@ class WSQConv2d(nn.Module):
     bit2 = [0.5288, 0.9816]
     bit3 = [0.4510, 0.7481, 0.9882]
     bit4 = [0.2960, 0.5567, 0.7088, 1.1286]
+    bit5 = [0.2455, 0.4734, 0.5989, 0.9206, 0.9904]
+    bit6 = [0.2219, 0.3354, 0.4478, 0.8548, 0.8936, 0.9315]
     bit8 = [0.0498, 0.0991, 0.203, 0.3355, 0.5280, 0.9925, 1.3935, 1.4585]
 
     def __init__(self, n_bits=1, clip_prob=-1):
@@ -101,33 +104,58 @@ def WSQ_update(model, global_model, args):
                 param.data.copy_(quant_conv1x1(param.data, g_params[name].data)) 
 
                
-def quantize_and_dequantize(tensor, global_tensor, bit_width, lr=1.0):
+def quantize_and_dequantize(tensor, global_tensor, bit_width, lr=1.0, flag = False, quantization_weight=None):
     residual = tensor - global_tensor
-    original_shape = residual.shape
-    residual_flatten = residual.view(-1)
     
-    norm = torch.norm(residual_flatten)
-    if norm < 1e-12:
-        return torch.zeros_like(residual_flatten), torch.zeros_like(residual), global_tensor.clone()
+    # BFP 양자화
+    if flag is True:
+        # E(w) : formula (2) 계산
+        max_val = torch.max(torch.abs(residual))
+        exponent = torch.floor(torch.log2(max_val + 1e-6))
+        exponent = torch.clamp(exponent, -(2 ** (bit_width -1)), 2 ** (bit_width - 1) - 1)
+
+        theta = 2 ** (exponent + 2 - bit_width)
+
+        # Q(x) : formula (3) 계산
+        floor_val = torch.floor(residual / theta)
+        ceil_val = torch.ceil(residual / theta)
+        prob = (residual / theta) - floor_val
+        quantized = torch.where(torch.rand_like(prob) < prob, ceil_val, floor_val)
+        
+        quantized_actual = quantized * theta
+        
+        lower_bound = -2 ** (exponent + 1)
+        upper_bound = 2** (exponent + 1) - 2 ** (exponent + 2 - bit_width)
+        dequantized = torch.clamp(quantized_actual, lower_bound, upper_bound)
+        
+        weighted_dequantized = dequantized * quantization_weight
+        updated_global_tensor = global_tensor + weighted_dequantized * lr
     
+    else:
+        original_shape = residual.shape
+        residual_flatten = residual.view(-1)
+        
+        norm = torch.norm(residual_flatten)
+        if norm < 1e-12:
+            return torch.zeros_like(residual_flatten), torch.zeros_like(residual), global_tensor.clone()
 
-    levels = 2 ** (bit_width - 1)
-    abs_ratio = torch.abs(residual_flatten) / norm
-    scaled_ratio = torch.clamp(abs_ratio * (levels), 0, levels)
-    lower_index = torch.floor(scaled_ratio).long()
-    upper_index = torch.clamp(lower_index + 1, 0, levels)
-    p_upper = scaled_ratio - lower_index
-    random_values = torch.rand_like(abs_ratio)
-    selected_index = torch.where(random_values < p_upper, upper_index, lower_index)
-    quantized_values = torch.arange(0, levels + 1) / (levels)
-    selected_levels = quantized_values[selected_index]
-    quantized_flatten = norm * torch.sign(residual_flatten) * selected_levels
+        levels = 2 ** (bit_width - 1)
+        abs_ratio = torch.abs(residual_flatten) / norm
+        scaled_ratio = torch.clamp(abs_ratio * (levels), 0, levels)
+        lower_index = torch.floor(scaled_ratio).long()
+        upper_index = torch.clamp(lower_index + 1, 0, levels)
+        p_upper = scaled_ratio - lower_index
+        random_values = torch.rand_like(abs_ratio)
+        selected_index = torch.where(random_values < p_upper, upper_index, lower_index)
+        quantized_values = torch.arange(0, levels + 1) / (levels)
+        selected_levels = quantized_values[selected_index]
+        quantized_flatten = norm * torch.sign(residual_flatten) * selected_levels
 
-    dequantized_tensor = quantized_flatten.view(original_shape)
-    
-    updated_global_tensor = global_tensor + lr * dequantized_tensor # lr 어떻게 설정할지.. 일단 1로
+        dequantized_tensor = quantized_flatten.view(original_shape)
+        
+        updated_global_tensor = global_tensor + lr * dequantized_tensor # lr 어떻게 설정할지.. 일단 1로
 
-    return quantized_flatten, dequantized_tensor, updated_global_tensor
+    return updated_global_tensor
 
 
 def PAQ_update(model, global_model, args):
@@ -136,25 +164,112 @@ def PAQ_update(model, global_model, args):
     lr = getattr(args, 'global_PAQ_lr', 1.0)
 
     g_params = dict(global_model.named_parameters())
-
+    
+    
     for name, param in model.named_parameters():
-        if 'first-last' in args.quantizer.keyword and name == 'conv1.weight':
-      
-            global_param = g_params[name]
-            q, dq, updated_local = quantize_and_dequantize(param.data, global_param.data, s, lr)
-            param.data.copy_(updated_local)
-
-        elif 'first-last' in args.quantizer.keyword and name == 'fc.weight':
-      
-            global_param = g_params[name]
-            q, dq, updated_local = quantize_and_dequantize(param.data, global_param.data, s, lr)
-            param.data.copy_(updated_local)
-
-        elif "conv" in name or "downsample.0.weight" in name:
-         
-            global_param = g_params[name]
-            q, dq, updated_local = quantize_and_dequantize(param.data, global_param.data, s, lr)
-            param.data.copy_(updated_local)
-            # print(torch.sum(~(updated_local != g_params[name])).item())
-
+        if hasattr(args.quantizer, 'keyword'):
+            if 'first-last' in args.quantizer.keyword and name == 'conv1.weight':
+                global_param = g_params[name]
+                updated_local = quantize_and_dequantize(param.data, global_param.data, s, lr)
+                param.data.copy_(updated_local)
+                
+            elif name != "conv1.weight" and ("conv1.weight" in name or "conv2.weight" in name):
+                global_param = g_params[name]
+                updated_local = quantize_and_dequantize(param.data, global_param.data, s, lr)
+                param.data.copy_(updated_local)
+                
+            elif "downsample.0.weight" in name:
+                global_param = g_params[name]
+                updated_local = quantize_and_dequantize(param.data, global_param.data, s, lr)
+                param.data.copy_(updated_local)
+            
+            elif 'first-last' in args.quantizer.keyword and name == 'fc.weight':
+                global_param = g_params[name]
+                updated_local = quantize_and_dequantize(param.data, global_param.data, s, lr)
+                param.data.copy_(updated_local)
+                
     return model
+
+
+def compute_q_i(residual_model, after_residual_model):
+
+    max_ratio = 0.0 
+
+    for param_name in residual_model:
+        p_new = after_residual_model[param_name] 
+        p_orig = residual_model[param_name]       
+
+        orig_norm_sq = p_orig.pow(2).sum().item()
+        if orig_norm_sq == 0.0:
+
+            ratio = 0.0
+        else:
+            diff_norm_sq = (p_new - p_orig).pow(2).sum().item()
+            ratio = diff_norm_sq / orig_norm_sq
+
+        if ratio > max_ratio:
+            max_ratio = ratio
+
+    return max_ratio
+
+def compute_p_i(q_list):
+
+    inv_terms = [1.0 / (1.0 + q) for q in q_list] 
+    denom = sum(inv_terms)  
+    if denom == 0:
+        return [1.0 / len(q_list)] * len(q_list)
+    
+    p_list = [term / denom for term in inv_terms]
+    return p_list
+
+def compute_parameter_residuals(model, global_model):
+
+    residual_model = {}  
+
+    for (param_name, param), (param_name_global, param_global) in zip(model.named_parameters(), global_model.named_parameters()):
+   
+        residual = param - param_global
+        residual_model[param_name] = residual.clone()
+    
+    return residual_model
+
+
+def HQ_update(self, model, global_model, args):
+    s = args.quantizer.wt_bit
+
+    lr = 1.0
+
+    if 'BFP' in self.args.quantizer.keyword:
+        flag = True
+        quantization_weight = 1.0
+        
+    g_params = dict(global_model.named_parameters())
+
+    residual_model = compute_parameter_residuals(model, global_model)
+    
+    for name, param in model.named_parameters():
+        if hasattr(args.quantizer, 'keyword'):
+            if 'first-last' in args.quantizer.keyword and name == 'conv1.weight':
+                global_param = g_params[name]
+                updated_local = quantize_and_dequantize(param.data, global_param.data, s, lr, flag, quantization_weight)
+                param.data.copy_(updated_local)
+                
+            elif name != "conv1.weight" and ("conv1.weight" in name or "conv2.weight" in name):
+                global_param = g_params[name]
+                updated_local = quantize_and_dequantize(param.data, global_param.data, s, lr, flag, quantization_weight)
+                param.data.copy_(updated_local)
+                
+            elif "downsample.0.weight" in name:
+                global_param = g_params[name]
+                updated_local = quantize_and_dequantize(param.data, global_param.data, s, lr, flag, quantization_weight)
+                param.data.copy_(updated_local)
+            
+            elif 'first-last' in args.quantizer.keyword and name == 'fc.weight':
+                global_param = g_params[name]
+                updated_local = quantize_and_dequantize(param.data, global_param.data, s, lr, flag, quantization_weight)
+                param.data.copy_(updated_local)
+
+    after_resiudal_model = compute_parameter_residuals(model, global_model)
+    local_error = compute_q_i(residual_model, after_resiudal_model)
+    
+    return local_error
