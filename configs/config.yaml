@@ -18,7 +18,7 @@ checkpoint_path: './checkpoints'
 exp_name: base
 output_model_path: 'res18.pt'
 save_freq: 1000
-batch_size: 50
+batch_size: 100
 save_test: False 
 
 ## Resume
@@ -56,9 +56,9 @@ defaults:
   - trainer: base
   - client: base
   - evaler: base
-  - dataset: cifar100
+  - dataset: tinyimagenet
   - server: base
-  - model: resnet18
-  - quantizer: base
+  - model: resnet18_WS
+  - quantizer: PAQ
   # - override hydra/job_logging: colorlog_custom
   # - override hydra/hydra_logging: colorlog

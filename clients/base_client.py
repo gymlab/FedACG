@@ -146,6 +146,8 @@ class Client():
                     
                 images, labels = images.to(self.device), labels.to(self.device)
                 self.model.zero_grad(set_to_none=True)
+                
+                labels = labels.long()
 
                 with autocast(enabled=self.args.use_amp):
                     losses = self._algorithm(images, labels)
