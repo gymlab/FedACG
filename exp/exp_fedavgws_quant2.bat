@@ -7,15 +7,15 @@ set BITS=1 2 4 8
 set METHODS=PAQ HQ
 set ALPHA=0.3
 set PARTICIPATION_RATE=0.02
-set NUM_CLIENTS=100 500
+
+set NUM_CLIENTS=100
+set BATCH_SIZE=50
+
+if "%DATASETS%" == "tinyimagenet" (
+    set BATCH_SIZE=100
+)
 
 for %%D in (%DATASETS%) do (
-    setlocal
-    if "%%D" == "tinyimagenet" (
-        set BATCH_SIZE=100
-    ) else (
-        set BATCH_SIZE=50
-    )
 
     for %%M in (%METHODS%) do (
         for %%B in (%BITS%) do (
