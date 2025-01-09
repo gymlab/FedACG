@@ -56,9 +56,9 @@ defaults:
   - trainer: base
   - client: base
   - evaler: base
-  - dataset: tinyimagenet
+  - dataset: cifar100
   - server: base
-  - model: resnet18_WS
-  - quantizer: PAQ
+  - model: resnet18
+  - quantizer: base
   # - override hydra/job_logging: colorlog_custom
   # - override hydra/hydra_logging: colorlog
