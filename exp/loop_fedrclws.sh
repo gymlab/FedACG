@@ -20,19 +20,19 @@ for DATASET in "${data_sets[@]}"; do
         if [ "$SPLIT_MODE" = "iid" ]; then
             # For iid mode, no need to iterate over alpha
             ALPHA=0.6
-            EXP_NAME="FedDecorr_iid"
-            python3 federated_train.py client=Decorr server=base visible_devices=\'$DEVICE\' seed=$SEED \
+            EXP_NAME="FedRCL_iid"
+            python3 federated_train.py client=fedrcl server=base visible_devices=\'$DEVICE\' seed=$SEED \
                 exp_name="$EXP_NAME" dataset="$DATASET" trainer.num_clients=100 \
                 split.mode="$SPLIT_MODE" trainer.participation_rate=0.05 \
-                batch_size="$BATCH_SIZE" wandb=True project="FedWS_5_100_seed2"
+                batch_size="$BATCH_SIZE" wandb=True model=resnet18_WS project="FedWS_5_100_seed2"
         else
             # For non-iid mode, iterate over alpha values
             for ALPHA in "${alpha_values[@]}"; do
-                EXP_NAME=FedDecorr_"$ALPHA"
-                python3 federated_train.py client=Decorr server=base visible_devices=\'$DEVICE\' seed=$SEED \
+                EXP_NAME=FedRCL_"$ALPHA"
+                python3 federated_train.py client=fedrcl server=base visible_devices=\'$DEVICE\' seed=$SEED \
                     exp_name="$EXP_NAME" dataset="$DATASET" trainer.num_clients=100 \
                     split.mode="$SPLIT_MODE" split.alpha="$ALPHA" trainer.participation_rate=0.05 \
-                    batch_size="$BATCH_SIZE" wandb=True project="FedWS_5_100_seed2"
+                    batch_size="$BATCH_SIZE" wandb=True model=resnet18_WS project="FedWS_5_100_seed2"
             done
         fi
     done
