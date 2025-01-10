@@ -18,7 +18,7 @@ checkpoint_path: './checkpoints'
 exp_name: base
 output_model_path: 'res18.pt'
 save_freq: 1000
-batch_size: 50
+batch_size: 100
 save_test: False 
 
 ## Resume

@@ -236,9 +236,11 @@ def compute_parameter_residuals(model, global_model):
 
 def HQ_update(self, model, global_model, args):
     s = args.quantizer.wt_bit
-
     lr = 1.0
 
+    flag = False
+    quantization_weight = 1.0
+    
     if 'BFP' in self.args.quantizer.keyword:
         flag = True
         quantization_weight = 1.0
