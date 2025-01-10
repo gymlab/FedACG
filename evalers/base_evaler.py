@@ -86,7 +86,9 @@ class Evaler():
             # for images, labels in self.loaders["test"]:
             for idx, (images, labels) in enumerate(self.test_loader):
                 images, labels = images.to(device), labels.to(device)
-
+                
+                labels = labels.long()
+                
                 results = model(images)
                 _, predicted = torch.max(results["logit"].data, 1) # if errors occur, use ResNet18_base instead of ResNet18_GFLN
                 total += labels.size(0)
