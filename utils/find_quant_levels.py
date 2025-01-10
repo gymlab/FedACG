@@ -78,8 +78,8 @@ def generate_alpha_and_q(M, step=0.001, max_value=3):
             print(f"{100*k/total_iters:.2f}% Brute-force done | Alpha: {selected_alpha} | Min Err.: {min_val}")
 
 # Example usage
-M = 8 # Number of alpha variables
+M = 7 # Number of alpha variables
 step = 0.0375  # Step size
-max_value = 1.5 # Maximum value for alpha
+max_value = 1.8 # Maximum value for alpha
 
 generate_alpha_and_q(M, step, max_value)
