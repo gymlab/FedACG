@@ -150,7 +150,6 @@ class Trainer():
             if not self.args.multiprocessing:
                 break
 
-
     def train(self) -> Dict:
 
         result_queue = mp.Manager().Queue()

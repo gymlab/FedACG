@@ -257,4 +257,4 @@ class RCLClient(Client):
 
         gc.collect()
 
-        return self.model.state_dict(), loss_dict
+        return self.model.state_dict(), loss_dict, None
