@@ -1,14 +1,16 @@
 CUDA_VISIBLE_DEVICES=0
-DATASET=tinyimagenet
+DATASET=cifar100
 BATCH_SIZE=50
 if [ ${DATASET} = "tinyimagenet" ];then
     BATCH_SIZE=100
 fi 
-ALPHA=0.3
+ALPHA=0.05
 NBITS=2
+DEVICE=3
 
-python3 federated_train.py client=base server=base visible_devices=\'2\' exp_name=FedAvgWSQ_"$ALPHA"_"B$NBITS" \
-dataset=${DATASET} trainer.num_clients=100 split.alpha=${ALPHA} trainer.participation_rate=0.02 \
-quantizer=WSQ quantizer.wt_bit=${NBITS} \
-batch_size=${BATCH_SIZE} wandb=True model=resnet18_WS project="dev_quant2" \
-# split.mode=iid
+python3 federated_train.py client=base server=base visible_devices=\'$DEVICE\' exp_name=FedAvgWSQ_iid_"B$NBITS" \
+dataset=${DATASET} trainer.num_clients=100 split.alpha=${ALPHA} trainer.participation_rate=0.05 \
+batch_size=${BATCH_SIZE} wandb=False model=resnet18_WS project="dev_quant2" \
+split.mode=iid
+# quantizer=WSQ quantizer.wt_bit=${NBITS} \
+# python3 federated_train.py client=base server=base visible_devices=\'$DEVICE\' exp_name=FedAvgWSQ_"$ALPHA"_"B$NBITS" \

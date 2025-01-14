@@ -90,7 +90,7 @@ class WSQConv2d(nn.Module):
 def WSQ_update(model, global_model, args):
     
     g_params = dict(global_model.named_parameters())
-    
+        
     for name, param in model.named_parameters():
         if hasattr(args.quantizer, 'keyword'):
             if 'first-last' in args.quantizer.keyword and name == 'conv1.weight':
@@ -105,6 +105,60 @@ def WSQ_update(model, global_model, args):
 
                
 def quantize_and_dequantize(tensor, global_tensor, bit_width, lr=1.0, flag = False, quantization_weight=None):
+    residual = tensor - global_tensor
+    
+    # BFP 양자화
+    if flag is True:
+        # E(w) : formula (2) 계산
+        max_val = torch.max(torch.abs(residual))
+        exponent = torch.floor(torch.log2(max_val + 1e-6))
+        exponent = torch.clamp(exponent, -(2 ** (bit_width -1)), 2 ** (bit_width - 1) - 1)
+
+        theta = 2 ** (exponent + 2 - bit_width)
+
+        # Q(x) : formula (3) 계산
+        floor_val = torch.floor(residual / theta)
+        ceil_val = torch.ceil(residual / theta)
+        prob = (residual / theta) - floor_val
+        quantized = torch.where(torch.rand_like(prob) < prob, ceil_val, floor_val)
+        
+        quantized_actual = quantized * theta
+        
+        lower_bound = -2 ** (exponent + 1)
+        upper_bound = 2** (exponent + 1) - 2 ** (exponent + 2 - bit_width)
+        dequantized = torch.clamp(quantized_actual, lower_bound, upper_bound)
+        
+        weighted_dequantized = dequantized * quantization_weight
+        updated_global_tensor = global_tensor + weighted_dequantized * lr
+    
+    else:
+        original_shape = residual.shape
+        residual_flatten = residual.view(-1)
+        
+        norm = torch.norm(residual_flatten)
+        if norm < 1e-12:
+            return torch.zeros_like(residual_flatten), torch.zeros_like(residual), global_tensor.clone()
+
+        levels = 2 ** (bit_width - 1)
+        abs_ratio = torch.abs(residual_flatten) / norm
+        scaled_ratio = torch.clamp(abs_ratio * (levels), 0, levels)
+        lower_index = torch.floor(scaled_ratio).long()
+        upper_index = torch.clamp(lower_index + 1, 0, levels)
+        p_upper = scaled_ratio - lower_index
+        random_values = torch.rand_like(abs_ratio)
+        selected_index = torch.where(random_values < p_upper, upper_index, lower_index)
+        quantized_values = torch.arange(0, levels + 1) / (levels)
+        selected_levels = quantized_values[selected_index]
+        quantized_flatten = norm * torch.sign(residual_flatten) * selected_levels
+
+        dequantized_tensor = quantized_flatten.view(original_shape)
+        
+        updated_global_tensor = global_tensor + lr * dequantized_tensor # lr 어떻게 설정할지.. 일단 1로
+
+    return updated_global_tensor
+
+
+def normalfloat(tensor, global_tensor, bit_width, lr=1.0, flag = False, quantization_weight=None):
     residual = tensor - global_tensor
     
     # BFP 양자화
