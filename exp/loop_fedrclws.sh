@@ -3,7 +3,7 @@
 data_sets=(cifar10 cifar100 tinyimagenet)
 alpha_values=(0.05 0.1 0.3 0.6)
 SEED=100
-DEVICE=1
+DEVICE=0
 
 # Iterate over datasets
 for DATASET in "${data_sets[@]}"; do

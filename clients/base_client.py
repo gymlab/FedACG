@@ -22,6 +22,26 @@ from clients.build import CLIENT_REGISTRY
 
 from utils.qunat_function import AQD_update , PAQ_update, WSQ_update, HQ_update
 
+
+def calculate_tail_index(data):
+    """
+    Calculates the tail index for a dataset based on extreme values.
+    
+    Args:
+        data (array-like): Flattened kernel data.
+    
+    Returns:
+        tail_index (float): Estimated tail index.
+    """
+    sorted_data = np.sort(np.abs(data))
+    top_10_percent = sorted_data[int(0.9 * len(sorted_data)):]  # Top 10% extreme values
+    if len(top_10_percent) > 1:
+        tail_index = np.mean(np.log(top_10_percent / top_10_percent[0]))
+    else:
+        tail_index = 0.0
+    return tail_index
+
+
 @CLIENT_REGISTRY.register()
 class Client():
 
@@ -176,6 +196,17 @@ class Client():
 
         self.model.to('cpu')
         self.global_model.to('cpu')
+
+        # # Temp
+        # key_name = 'layer3.0.conv2.weight'
+        # m = dict(self.model.named_parameters())
+        # g = dict(self.global_model.named_parameters())
+        # residual = m[key_name].data - g[key_name].data
+        # import os
+        # os.makedirs('./tmp', exist_ok=True)
+        # residual = residual.cpu().numpy()
+        # save_path = ('./tmp/diff_ws_5_100_iid.npy')
+        # np.save(save_path, residual)
         
         # Quantization
         if self.args.quantizer.uplink:
@@ -264,5 +295,4 @@ class Client():
             losses["Dyn"] = - lg_loss + 0.5 * self.args.client.Dyn.alpha * prox_loss
             
         del results
-
         return losses

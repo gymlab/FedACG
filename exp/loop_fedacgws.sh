@@ -7,7 +7,6 @@ DEVICE=1
 
 # Iterate over datasets
 for DATASET in "${data_sets[@]}"; do
-    D
     # Set default BATCH_SIZE based on dataset
     if [ "$DATASET" = "tinyimagenet" ]; then
         BATCH_SIZE=100
