@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 from clients.build import CLIENT_REGISTRY
 
-from utils.qunat_function import AQD_update , PAQ_update, WSQ_update, HQ_update
+from utils.qunat_function import AQD_update , PAQ_update, WSQ_update, HQ_update, NF_update
 
 
 def calculate_tail_index(data):
@@ -166,8 +166,6 @@ class Client():
                     
                 images, labels = images.to(self.device), labels.to(self.device)
                 self.model.zero_grad(set_to_none=True)
-                
-                labels = labels.long()
 
                 with autocast(enabled=self.args.use_amp):
                     losses = self._algorithm(images, labels)
@@ -198,15 +196,17 @@ class Client():
         self.global_model.to('cpu')
 
         # # Temp
-        # key_name = 'layer3.0.conv2.weight'
-        # m = dict(self.model.named_parameters())
         # g = dict(self.global_model.named_parameters())
-        # residual = m[key_name].data - g[key_name].data
+        
         # import os
-        # os.makedirs('./tmp', exist_ok=True)
-        # residual = residual.cpu().numpy()
-        # save_path = ('./tmp/diff_ws_5_100_iid.npy')
-        # np.save(save_path, residual)
+        # for name, param in self.model.named_parameters():
+        #     if 'conv2.weight' in name:
+        #         residual = param.data - g[name].data
+        
+        #         os.makedirs('./tmp', exist_ok=True)
+        #         residual = residual.cpu().numpy()
+        #         save_path = (f'./tmp/diff_{name}_0.05.npy')
+        #         np.save(save_path, residual)
         
         # Quantization
         if self.args.quantizer.uplink:
@@ -218,6 +218,8 @@ class Client():
                 PAQ_update(self.model, self.global_model, self.args)
             elif self.args.quantizer.name == "HQ":
                 local_error = HQ_update(self, self.model, self.global_model, self.args)
+            elif self.args.quantizer.name == "NF":
+                NF_update(self.model, self.global_model, self.args)
         
         loss_dict = {
             f'loss/{self.args.dataset.name}': loss_meter.avg,

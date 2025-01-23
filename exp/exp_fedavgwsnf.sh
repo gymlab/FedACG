@@ -6,11 +6,11 @@ if [ ${DATASET} = "tinyimagenet" ];then
 fi 
 ALPHA=0.1
 NBITS=4
-DEVICE=2
+DEVICE=0
 
-python3 federated_train.py client=base server=base visible_devices=\'$DEVICE\' exp_name=FedAvgWSQV9_"$ALPHA"_"B$NBITS" \
+python3 federated_train.py client=base server=base visible_devices=\'$DEVICE\' exp_name=FedAvgWSNF_"$ALPHA"_"B$NBITS" \
 dataset=${DATASET} trainer.num_clients=100 split.alpha=${ALPHA} trainer.participation_rate=0.05 \
-quantizer=WSQ quantizer.wt_bit=${NBITS} \
+quantizer=NF quantizer.wt_bit=${NBITS} \
 batch_size=${BATCH_SIZE} wandb=True model=resnet18_WS project="dev_quant" \
 # split.mode=iid
 # quantizer=WSQ quantizer.wt_bit=${NBITS} \
