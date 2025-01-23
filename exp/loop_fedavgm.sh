@@ -2,7 +2,7 @@
 
 data_sets=(cifar10 cifar100 tinyimagenet)
 alpha_values=(0.05 0.1 0.3 0.6)
-SEED=100
+SEED=1000
 DEVICE=0
 
 # Iterate over datasets
@@ -24,7 +24,7 @@ for DATASET in "${data_sets[@]}"; do
             python3 federated_train.py client=base server=FedAvgM visible_devices=\'$DEVICE\' seed=$SEED \
                 exp_name="$EXP_NAME" dataset="$DATASET" trainer.num_clients=100 \
                 split.mode="$SPLIT_MODE" trainer.participation_rate=0.05 \
-                batch_size="$BATCH_SIZE" wandb=True project="FedWS_5_100_seed2"
+                batch_size="$BATCH_SIZE" wandb=True project="FedWS_5_100_seed3"
         else
             # For non-iid mode, iterate over alpha values
             for ALPHA in "${alpha_values[@]}"; do
@@ -32,7 +32,7 @@ for DATASET in "${data_sets[@]}"; do
                 python3 federated_train.py client=base server=FedAvgM visible_devices=\'$DEVICE\' seed=$SEED \
                     exp_name="$EXP_NAME" dataset="$DATASET" trainer.num_clients=100 \
                     split.mode="$SPLIT_MODE" split.alpha="$ALPHA" trainer.participation_rate=0.05 \
-                    batch_size="$BATCH_SIZE" wandb=True project="FedWS_5_100_seed2"
+                    batch_size="$BATCH_SIZE" wandb=True project="FedWS_5_100_seed3"
             done
         fi
     done
