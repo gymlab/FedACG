@@ -50,8 +50,9 @@ def generate_alpha_and_q(M, step=0.001, max_value=3):
     print(f"Total iters: {total_iters}")
     # Process each combination
     for k, alpha in enumerate(alpha_combinations):
-        if sum(alpha) > 5:
+        if sum(alpha) > 6:
             continue
+        
         # Generate all combinations of b_k in {-1, 1} for 2^(M-1) terms
         b_combinations = np.array(np.meshgrid(*[[-1, 1]] * len(alpha))).T.reshape(-1, len(alpha))
 
@@ -65,10 +66,25 @@ def generate_alpha_and_q(M, step=0.001, max_value=3):
         q_minus = unique_positive_q[:-1] - unique_positive_q[1:]
         q_plus = unique_positive_q[:-1] + unique_positive_q[1:]
         s = q_plus * 0.5
+        s1 = unique_positive_q[0] * 0.5
         q_square_diff = q_minus * q_plus
         
-        total_error = np.sqrt(2./np.pi) * (np.sum(q_minus * np.exp(- 0.5 * (s ** 2))) - unique_positive_q[0]) \
-                        + 0.5 * (np.sum(q_square_diff * special.erf(s / np.sqrt(2))) + (unique_positive_q[-1] ** 2 + 1))
+        if M > 2:
+            total_error = np.sqrt(2./np.pi) * np.sum(q_minus * np.exp(- 0.5 * (s ** 2))) \
+                        + 0.5 * np.sum(q_square_diff * special.erf(s / np.sqrt(2))) \
+                        + np.sqrt(1./(2*np.pi)) * (0.5 * s1 - 2 * unique_positive_q[0]) * np.exp(- 0.5 * (s1 ** 2)) \
+                        - 0.25 * (2 * unique_positive_q[0] ** 2 + 1) * special.erf(s1 / np.sqrt(2)) \
+                        + (1. / (2 * np.sqrt(2 * np.pi))) * (2 * unique_positive_q[-1] - s[-1]) * np.exp(- 0.5 * (s[-1] ** 2)) \
+                        - (1. / np.sqrt(2 * np.pi)) * (2 * unique_positive_q[-2] - s[-2]) * np.exp(- 0.5 * (s[-2] ** 2)) \
+                        + 0.5 * ((unique_positive_q[-1] ** 2 + 1) * (1. - special.erf(s[-1] / np.sqrt(2))) + (unique_positive_q[-2] ** 2 + 1) * (1. - special.erf(s[-2] / np.sqrt(2)))) \
+                        + 0.5 * (unique_positive_q[-1] ** 2 + 1)
+        elif M == 2:
+            total_error = 2 * err(0, 0, s1, cache)
+            total_error += err(unique_positive_q[0], s1, s[0], cache)
+            total_error += err(unique_positive_q[1], s[0], np.inf, cache)
+            total_error += err(unique_positive_q[0], s1, np.inf, cache)
+        elif M == 1:
+            total_error = 2 * err(unique_positive_q[0], 0, np.inf, cache)
 
         if min_val > total_error:
             min_val = total_error
@@ -78,8 +94,8 @@ def generate_alpha_and_q(M, step=0.001, max_value=3):
             print(f"{100*k/total_iters:.2f}% Brute-force done | Alpha: {selected_alpha} | Min Err.: {min_val}")
 
 # Example usage
-M = 7 # Number of alpha variables
-step = 0.0375  # Step size
-max_value = 1.8 # Maximum value for alpha
+M = 1 # Number of alpha variables
+step = 0.0001  # Step size
+max_value = 4 # Maximum value for alpha
 
 generate_alpha_and_q(M, step, max_value)
