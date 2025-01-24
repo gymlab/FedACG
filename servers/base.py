@@ -28,7 +28,7 @@ class Server():
         for param_key in local_weights:
             local_weights[param_key] = sum(local_weights[param_key])/C
         return local_weights
-
+    
 @SERVER_REGISTRY.register()
 class AnalizeServer():
 

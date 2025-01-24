@@ -167,11 +167,10 @@ class WSQConv2d(nn.Module):
         with torch.no_grad():
             x = x - global_x    # residual
             
-            # V11
             x_mean = x.mean().view(-1, 1, 1, 1)
             x = x - x_mean
             
-            # clip V9
+            # clip: V11
             x_abs = torch.abs(x)
             k = int((1 - self.clip_prob) * x_abs.numel())
             clip_threshold = torch.kthvalue(x_abs.view(-1), k).values
