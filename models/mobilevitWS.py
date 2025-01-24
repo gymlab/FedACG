@@ -43,11 +43,13 @@ class WSConv2d(nn.Conv2d):
 
 def conv_2d(inp, oup, kernel_size=3, stride=1, padding=0, groups=1, bias=False, norm=True, act=True):
     conv = nn.Sequential()
-    conv.add_module('conv', WSConv2d(inp, oup, kernel_size, stride, padding, bias=bias, groups=groups))
     if norm:
+        conv.add_module('conv', WSConv2d(inp, oup, kernel_size, stride, padding, bias=bias, groups=groups))
         conv.add_module('GroupNorm', nn.GroupNorm(2, oup))
+    else:
+        conv.add_module('conv', nn.Conv2d(inp, oup, kernel_size, stride, padding, bias=bias, groups=groups))
     if act:
-        conv.add_module('Activation', nn.SiLU())
+        conv.add_module('Activation', nn.ReLU())
     return conv
 
 
@@ -334,4 +336,4 @@ class MobileViT_Net(nn.Module):
 class MobileViTWS(MobileViT_Net):
     
     def __init__(self, args: DictConfig, num_classes: int = 10, **kwargs):
-        super().__init__((32, 32), "small", num_classes=num_classes, patch_size=(2,2))
+        super().__init__((32, 32), "x_small", num_classes=num_classes, patch_size=(2,2))
