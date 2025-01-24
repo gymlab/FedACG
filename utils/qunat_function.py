@@ -176,10 +176,8 @@ class WSQConv2d(nn.Module):
             clip_threshold = torch.kthvalue(x_abs.view(-1), k).values
             x_clipped = torch.clamp(x, min=-clip_threshold, max=clip_threshold)
             x_std = x_clipped.std().view(1, 1, 1, 1)
-            
-            # V9
+
             # x_std = x.std().view(1, 1, 1, 1) * 0.95
-            
             x = x / x_std.expand_as(x)
 
             indices = torch.bucketize(x, self.edges, right=False)
