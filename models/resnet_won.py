@@ -13,6 +13,7 @@ from models.build import ENCODER_REGISTRY
 from typing import Dict
 from omegaconf import DictConfig
 import torch.nn.init as init
+import numpy as np
 
 import logging
 logger = logging.getLogger(__name__)
@@ -23,13 +24,14 @@ class WonConv2d(nn.Conv2d):
                  padding=0, dilation=1, groups=1, bias=True):
         super(WonConv2d, self).__init__(in_channels, out_channels, kernel_size, stride,
                  padding, dilation, groups, bias)
+        self.in_channels = in_channels
         
     def normalize_weights(self):
         with torch.no_grad():
             weight_mean = self.weight.mean(dim=1, keepdim=True).mean(dim=2, keepdim=True).mean(dim=3, keepdim=True)
             self.weight -= weight_mean
             std = self.weight.view(self.weight.size(0), -1).std(dim=1).view(-1, 1, 1, 1) + 1e-5
-            self.weight.copy_(self.weight / std.expand_as(self.weight))
+            self.weight.copy_(self.weight / std.expand_as(self.weight) * 0.1)
 
 
 class BasicBlockWon(nn.Module):

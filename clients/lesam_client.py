@@ -24,7 +24,7 @@ from utils.qunat_function import AQD_update , PAQ_update, WSQ_update, HQ_update,
 
 
 @CLIENT_REGISTRY.register()
-class Client():
+class LESAMClient():
 
     def __init__(self, args, client_index, model=None, loader=None):
         self.args = args
@@ -148,22 +148,38 @@ class Client():
                 images, labels = images.to(self.device), labels.to(self.device)
                 self.model.zero_grad(set_to_none=True)
 
-                with autocast(enabled=self.args.use_amp):
-                    losses = self._algorithm(images, labels)
-                    # for loss_key in losses:
-                    #     if loss_key not in self.weights.keys():
-                    #         self.weights[loss_key] = 0
-                    loss = sum([self.weights[loss_key]*losses[loss_key] for loss_key in losses])
+                losses = self._algorithm(images, labels)
+                # for loss_key in losses:
+                #     if loss_key not in self.weights.keys():
+                #         self.weights[loss_key] = 0
+                loss = sum([self.weights[loss_key]*losses[loss_key] for loss_key in losses])
+                    
+                loss.backward(retain_graph=True)
 
-                try:
-                    scaler.scale(loss).backward()
-                    scaler.unscale_(self.optimizer)
-                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), 10)
-                    scaler.step(self.optimizer)
-                    scaler.update()
+                # SAM First Step: Add perturbation
+                grad_norm = torch.norm(torch.stack([p.grad.norm(p=2) for p in self.model.parameters() if p.grad is not None]))
+                scale = 0.1 / (grad_norm + 1e-7)
+                
+                for p in self.model.parameters():
+                    if p.grad is not None:
+                        e_w = p.grad * torch.tensor(scale, device=p.device, dtype=p.dtype)
+                        p.data.add_(e_w)
+                        self.optimizer.state[p]["e_w"] = e_w
 
-                except Exception as e:
-                    print(e)
+                self.model.zero_grad(set_to_none=True)
+                loss = self._algorithm(images, labels)
+                loss = sum([self.weights[loss_key]*losses[loss_key] for loss_key in losses])
+
+                loss.backward()
+
+                # SAM Second Step: Remove perturbation
+                for p in self.model.parameters():
+                    if p in self.optimizer.state and "e_w" in self.optimizer.state[p]:
+                        p.data.sub_(self.optimizer.state[p]["e_w"])
+                        del self.optimizer.state[p]["e_w"]
+
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), 10)
+                self.optimizer.step()
 
                 loss_meter.update(loss.item(), images.size(0))
                 time_meter.update(time.time() - end)
@@ -175,32 +191,6 @@ class Client():
 
         self.model.to('cpu')
         self.global_model.to('cpu')
-
-        # # Temp
-        # g = dict(self.global_model.named_parameters())
-        
-        # import os
-        # for name, param in self.model.named_parameters():
-        #     if 'conv2.weight' in name:
-        #         residual = param.data - g[name].data
-        
-        #         os.makedirs('./tmp', exist_ok=True)
-        #         residual = residual.cpu().numpy()
-        #         save_path = (f'./tmp/diff_{name}_0.05.npy')
-        #         np.save(save_path, residual)
-        
-        # Quantization
-        if self.args.quantizer.uplink:
-            if self.args.quantizer.name == "AQD":
-                AQD_update(self.model, self.args)
-            elif self.args.quantizer.name == "WSQ":
-                WSQ_update(self.model, self.global_model, self.args)
-            elif self.args.quantizer.name == "PAQ":
-                PAQ_update(self.model, self.global_model, self.args)
-            elif self.args.quantizer.name == "HQ":
-                local_error = HQ_update(self, self.model, self.global_model, self.args)
-            elif self.args.quantizer.name == "NF":
-                NF_update(self.model, self.global_model, self.args)
         
         loss_dict = {
             f'loss/{self.args.dataset.name}': loss_meter.avg,
