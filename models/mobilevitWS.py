@@ -41,13 +41,21 @@ class WSConv2d(nn.Conv2d):
         self.rho = rho
 
 
+def wsconv_2d(inp, oup, kernel_size=3, stride=1, padding=0, groups=1, bias=False, norm=True, act=True):
+    conv = nn.Sequential()
+    conv.add_module('conv', WSConv2d(inp, oup, kernel_size, stride, padding, bias=bias, groups=groups))
+    if norm:
+        conv.add_module('GroupNorm', nn.GroupNorm(2, oup))
+    if act:
+        conv.add_module('Activation', nn.ReLU())
+    return conv
+
+
 def conv_2d(inp, oup, kernel_size=3, stride=1, padding=0, groups=1, bias=False, norm=True, act=True):
     conv = nn.Sequential()
+    conv.add_module('conv', nn.Conv2d(inp, oup, kernel_size, stride, padding, bias=bias, groups=groups))
     if norm:
-        conv.add_module('conv', WSConv2d(inp, oup, kernel_size, stride, padding, bias=bias, groups=groups))
         conv.add_module('GroupNorm', nn.GroupNorm(2, oup))
-    else:
-        conv.add_module('conv', nn.Conv2d(inp, oup, kernel_size, stride, padding, bias=bias, groups=groups))
     if act:
         conv.add_module('Activation', nn.ReLU())
     return conv
@@ -62,9 +70,9 @@ class InvertedResidual(nn.Module):
         hidden_dim = int(round(inp * expand_ratio))
         self.block = nn.Sequential()
         if expand_ratio != 1:
-            self.block.add_module('exp_1x1', conv_2d(inp, hidden_dim, kernel_size=1, stride=1, padding=0))
+            self.block.add_module('exp_1x1', wsconv_2d(inp, hidden_dim, kernel_size=1, stride=1, padding=0))
         self.block.add_module('conv_3x3', conv_2d(hidden_dim, hidden_dim, kernel_size=3, stride=stride, padding=1, groups=hidden_dim))
-        self.block.add_module('red_1x1', conv_2d(hidden_dim, oup, kernel_size=1, stride=1, padding=0, act=False))
+        self.block.add_module('red_1x1', wsconv_2d(hidden_dim, oup, kernel_size=1, stride=1, padding=0, act=False))
         self.use_res_connect = self.stride == 1 and inp == oup
 
     def forward(self, x):
@@ -149,7 +157,7 @@ class MobileViTBlock(nn.Module):
 
         # local representation
         self.local_rep = nn.Sequential()
-        self.local_rep.add_module('conv_3x3', conv_2d(inp, inp, kernel_size=3, stride=1, padding=1))
+        self.local_rep.add_module('conv_3x3', wsconv_2d(inp, inp, kernel_size=3, stride=1, padding=1))
         self.local_rep.add_module('conv_1x1', conv_2d(inp, attn_dim, kernel_size=1, stride=1, norm=False, act=False))
         
         # global representation
@@ -160,8 +168,8 @@ class MobileViTBlock(nn.Module):
             self.global_rep.add_module(f'TransformerEncoder_{i}', TransformerEncoder(attn_dim, ffn_dim, heads, dim_head))
         self.global_rep.add_module('LayerNorm', nn.LayerNorm(attn_dim, eps=1e-5, elementwise_affine=True))
 
-        self.conv_proj = conv_2d(attn_dim, inp, kernel_size=1, stride=1, padding=0)
-        self.fusion = conv_2d(2*inp, inp, kernel_size=3, stride=1, padding=1)
+        self.conv_proj = wsconv_2d(attn_dim, inp, kernel_size=1, stride=1, padding=0)
+        self.fusion = wsconv_2d(2*inp, inp, kernel_size=3, stride=1, padding=1)
 
     def unfolding(self, feature_map):
         patch_w, patch_h = self.patch_w, self.patch_h
@@ -289,7 +297,7 @@ class MobileViT_Net(nn.Module):
         else:
             raise NotImplementedError
 
-        self.conv_0 = conv_2d(3, channels[0], kernel_size=3, stride=2, padding=1)
+        self.conv_0 = wsconv_2d(3, channels[0], kernel_size=3, stride=2, padding=1)
 
         self.layer_1 = nn.Sequential(
             InvertedResidual(channels[0], channels[1], stride=1, expand_ratio=mv2_exp_mult)
@@ -311,7 +319,7 @@ class MobileViT_Net(nn.Module):
             InvertedResidual(channels[4], channels[5], stride=2, expand_ratio=mv2_exp_mult),
             MobileViTBlock(channels[5], attn_dim[2], ffn_multiplier, heads=4, dim_head=8, attn_blocks=3, patch_size=patch_size)
         )
-        self.conv_1x1_exp = conv_2d(channels[-1], channels[-1]*last_layer_exp_factor, kernel_size=1, stride=1)
+        self.conv_1x1_exp = wsconv_2d(channels[-1], channels[-1]*last_layer_exp_factor, kernel_size=1, stride=1)
         self.out = nn.Linear(channels[-1]*last_layer_exp_factor, num_classes, bias=True)
 
     def forward(self, x):
