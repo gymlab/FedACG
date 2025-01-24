@@ -20,5 +20,6 @@ from models.MobileNetV3WS import *
 from models.quant import *
 from models.resnet_won import *
 from models.mobilevit import *
+from models.mobilevitWS import *
 
 from models.build import build_encoder
