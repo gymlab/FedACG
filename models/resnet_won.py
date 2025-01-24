@@ -35,29 +35,23 @@ class WonConv2d(nn.Conv2d):
 class BasicBlockWon(nn.Module):
     expansion = 1
 
-    def __init__(self, in_planes, planes, stride=1, use_bn_layer=False, rho=1e-3, init_mode="kaiming_uniform"):
+    def __init__(self, in_planes, planes, stride=1, use_bn_layer=False):
         super(BasicBlockWon, self).__init__()
         self.conv1 = WonConv2d(
-            in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False, rho=rho, init_mode=init_mode)
+            in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
         self.bn1 = nn.GroupNorm(2, planes) if not use_bn_layer else nn.BatchNorm2d(planes) 
         self.conv2 = WonConv2d(planes, planes, kernel_size=3,
-                               stride=1, padding=1, bias=False, rho=rho, init_mode=init_mode)
+                               stride=1, padding=1, bias=False)
         self.bn2 = nn.GroupNorm(2, planes) if not use_bn_layer else nn.BatchNorm2d(planes) 
 
         self.downsample = nn.Sequential()
         if stride != 1 or in_planes != self.expansion*planes:
             self.downsample = nn.Sequential(
                 WonConv2d(in_planes, self.expansion*planes,
-                          kernel_size=1, stride=stride, bias=False, rho=rho, init_mode=init_mode),
+                          kernel_size=1, stride=stride, bias=False),
                 nn.GroupNorm(2, self.expansion*planes) if not use_bn_layer else nn.BatchNorm2d(self.expansion*planes) 
             )
-            
-    def set_rho(self, rho):
-        self.conv1.set_rho(rho)
-        self.conv2.set_rho(rho)
-        if len(self.downsample) > 0:
-            self.downsample[0].set_rho(rho)
-            
+
     def normalize_weights(self):
         self.conv1.normalize_weights()
         self.conv2.normalize_weights()
@@ -89,22 +83,22 @@ class BasicBlockWon(nn.Module):
 class BottleneckWon(nn.Module):
     expansion = 4
     
-    def __init__(self, in_planes, planes, stride=1, use_bn_layer=False, rho=1e-3, init_mode="kaiming_uniform"):
+    def __init__(self, in_planes, planes, stride=1, use_bn_layer=False):
         super(BottleneckWon, self).__init__()
-        self.conv1 = WonConv2d(in_planes, planes, kernel_size=1, bias=False, rho=rho, init_mode=init_mode)
+        self.conv1 = WonConv2d(in_planes, planes, kernel_size=1, bias=False)
         self.bn1 = nn.GroupNorm(2, planes) if not use_bn_layer else nn.BatchNorm2d(planes)
         self.conv2 = WonConv2d(planes, planes, kernel_size=3,
-                               stride=stride, padding=1, bias=False, rho=rho, init_mode=init_mode)
+                               stride=stride, padding=1, bias=False)
         self.bn2 = nn.GroupNorm(2, planes) if not use_bn_layer else nn.BatchNorm2d(planes)
         self.conv3 = WonConv2d(planes, self.expansion *
-                               planes, kernel_size=1, bias=False, rho=rho, init_mode=init_mode)
+                               planes, kernel_size=1, bias=False)
         self.bn3 = nn.GroupNorm(2, self.expansion*planes) if not use_bn_layer else nn.BatchNorm2d(planes)
 
         self.downsample = nn.Sequential()
         if stride != 1 or in_planes != self.expansion*planes:
             self.downsample = nn.Sequential(
                 WonConv2d(in_planes, self.expansion*planes,
-                          kernel_size=1, stride=stride, bias=False, rho=rho, init_mode=init_mode),
+                          kernel_size=1, stride=stride, bias=False),
                 nn.GroupNorm(2, self.expansion*planes) if not use_bn_layer else nn.BatchNorm2d(planes)
             )
             
@@ -114,13 +108,6 @@ class BottleneckWon(nn.Module):
         self.conv3.normalize_weights()
         if len(self.downsample) > 0 and isinstance(self.downsample[0], WonConv2d):
             self.downsample[0].normalize_weights()        
-    
-    def set_rho(self, rho):
-        self.conv1.set_rho(rho)
-        self.conv2.set_rho(rho)
-        self.conv3.set_rho(rho)
-        if len(self.downsample) > 0:
-            self.downsample[0].set_rho(rho)
 
     def forward(self, x: torch.Tensor, no_relu: bool = False) -> torch.Tensor:
         out = F.relu(self.bn1(self.conv1(x)))
@@ -136,7 +123,7 @@ class BottleneckWon(nn.Module):
 
 class ResNet_WonConv(nn.Module):
     def __init__(self, block, num_blocks, num_classes=10, l2_norm=False, use_pretrained=False, use_bn_layer=False,
-                 last_feature_dim=512, rho=1e-3, init_mode="kaiming_uniform", **kwargs):
+                 last_feature_dim=512, **kwargs):
         
         #use_pretrained means whether to use torch torchvision.models pretrained model, and use conv1 kernel size as 7
         
@@ -149,13 +136,13 @@ class ResNet_WonConv(nn.Module):
 
         Linear = self.get_linear()   
         self.conv1 = WonConv2d(3, 64, kernel_size=conv1_kernel_size,
-                               stride=1, padding=1, bias=False, rho=rho, init_mode=init_mode)
+                               stride=1, padding=1, bias=False)
         self.bn1 = nn.GroupNorm(2, 64) if not use_bn_layer else nn.BatchNorm2d(64) 
         
-        self.layer1 = self._make_layer(block, 64, num_blocks[0], stride=1, use_bn_layer=use_bn_layer, rho=rho, init_mode=init_mode)
-        self.layer2 = self._make_layer(block, 128, num_blocks[1], stride=2, use_bn_layer=use_bn_layer, rho=rho, init_mode=init_mode)
-        self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2, use_bn_layer=use_bn_layer, rho=rho, init_mode=init_mode)
-        self.layer4 = self._make_layer(block, last_feature_dim, num_blocks[3], stride=2, use_bn_layer=use_bn_layer, rho=rho, init_mode=init_mode)
+        self.layer1 = self._make_layer(block, 64, num_blocks[0], stride=1, use_bn_layer=use_bn_layer)
+        self.layer2 = self._make_layer(block, 128, num_blocks[1], stride=2, use_bn_layer=use_bn_layer)
+        self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2, use_bn_layer=use_bn_layer)
+        self.layer4 = self._make_layer(block, last_feature_dim, num_blocks[3], stride=2, use_bn_layer=use_bn_layer)
 
         self.logit_detach = False        
 
@@ -172,22 +159,16 @@ class ResNet_WonConv(nn.Module):
             self.fc = Linear(last_feature_dim * block.expansion, num_classes, bias=False)
         else:
             self.fc = Linear(last_feature_dim * block.expansion, num_classes)
-    
-    def set_rho(self, rho):
-        self.conv1.rho
-        self.layer1.set_rho(rho)
-        self.layer2.set_rho(rho)
-        self.layer3.set_rho(rho)
-        self.layer4.set_rho(rho)        
+   
 
     def get_linear(self):
         return nn.Linear
 
-    def _make_layer(self, block, planes, num_blocks, stride, use_bn_layer=False, rho=1e-3, init_mode="kaiming_uniform"):
+    def _make_layer(self, block, planes, num_blocks, stride, use_bn_layer=False):
         strides = [stride] + [1]*(num_blocks-1)
         layers = []
         for stride in strides:
-            layers.append(block(self.in_planes, planes, stride, use_bn_layer=use_bn_layer, rho=rho, init_mode=init_mode))
+            layers.append(block(self.in_planes, planes, stride, use_bn_layer=use_bn_layer))
             self.in_planes = planes * block.expansion
         return nn.Sequential(*layers)
 
