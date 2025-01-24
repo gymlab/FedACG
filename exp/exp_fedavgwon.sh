@@ -9,5 +9,5 @@ DEVICE=1
 
 python3 federated_train.py client=Won server=base visible_devices=\'$DEVICE\' exp_name=FedAvgWon_"$ALPHA" \
 dataset=${DATASET} trainer.num_clients=100 split.alpha=${ALPHA} trainer.participation_rate=0.05 \
-batch_size=${BATCH_SIZE} wandb=True model=resnet18_Won project="dev_quant" \
+batch_size=${BATCH_SIZE} wandb=True model=resnet18_Won project="FedWS_5_100" \
 # split.mode=iid
