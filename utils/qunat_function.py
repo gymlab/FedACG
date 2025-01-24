@@ -167,18 +167,19 @@ class WSQConv2d(nn.Module):
         with torch.no_grad():
             x = x - global_x    # residual
             
-            # V11
             x_mean = x.mean().view(-1, 1, 1, 1)
             x = x - x_mean
             
-            # # clip V9
-            # x_abs = torch.abs(x)
-            # k = int((1 - self.clip_prob) * x_abs.numel())
-            # clip_threshold = torch.kthvalue(x_abs.view(-1), k).values
-            # x_clipped = torch.clamp(x, min=-clip_threshold, max=clip_threshold)
-            # x_std = x_clipped.std().view(1, 1, 1, 1)
-
-            x_std = x.std().view(1, 1, 1, 1) * 0.95
+            # clip: V11
+            x_abs = torch.abs(x)
+            k = int((1 - self.clip_prob) * x_abs.numel())
+            clip_threshold = torch.kthvalue(x_abs.view(-1), k).values
+            x_clipped = torch.clamp(x, min=-clip_threshold, max=clip_threshold)
+            x_std = x_clipped.std().view(1, 1, 1, 1)
+            
+            # V9
+            # x_std = x.std().view(1, 1, 1, 1) * 0.95
+            
             x = x / x_std.expand_as(x)
 
             indices = torch.bucketize(x, self.edges, right=False)
