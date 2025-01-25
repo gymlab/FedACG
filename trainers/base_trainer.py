@@ -76,6 +76,7 @@ class Trainer():
 
         self.clients: List[Client] = [client_type(self.args, client_index=c, model=copy.deepcopy(self.model)) for c in range(self.args.trainer.num_clients)]
         self.server = server
+        # Setting momentum at server
         if self.args.server.momentum > 0 or self.args.client.get('Dyn'):
             self.server.set_momentum(self.model)
 
@@ -99,7 +100,8 @@ class Trainer():
         self.start_round = 0
         if self.args.get('load_model_path'):
             self.load_model()
-
+        
+        # setting local_g, past_local_deltas at clients
         if self.args.client.get('Dyn'):
             local_g = copy.deepcopy(self.model.state_dict())
             for key in local_g.keys():
@@ -135,6 +137,7 @@ class Trainer():
                 'trainer': self,
             }
 
+            # update past_local_deltas, user idx
             if self.args.client.get('Dyn'):
                 setup_inputs['past_local_deltas'] = self.past_local_deltas
                 setup_inputs['user'] = task['client_idx']

@@ -276,6 +276,6 @@ class Client():
                 local_grad = torch.flatten(local_d)
                 lg_loss += (p * local_grad.detach()).sum()
             losses["Dyn"] = - lg_loss + 0.5 * self.args.client.Dyn.alpha * prox_loss
-            
+
         del results
         return losses
