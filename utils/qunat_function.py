@@ -262,10 +262,10 @@ def quantize_and_dequantize(tensor, global_tensor, bit_width, lr=1.0, flag = Fal
 
 
 class NormalFloat(nn.Module):
-    bit2 = [-1., 0., 0.3339, 1.]
-    bit3 = [-1., -0.4733, -0.2145, 0., 0.1589, 0.3339, 0.5568, 1.]
-    bit4 = [-1., -0.6901, -0.5195, -0.3903, -0.2810, -0.1825, -0.0899, 0.,
-            0.0786, 0.1589, 0.2431, 0.3339, 0.4357, 0.5568, 0.7170, 1.]
+    bit2 = [-0.6814, 0., 0.2788, 0.6814]
+    bit3 = [-0.8267, -0.4347, -0.2, 0., 0.1694, 0.3586, 0.6116, 0.8267]
+    bit4 = [-1.0000, -0.6962, -0.5257, -0.3946, -0.2849, -0.1892, -0.0931, 0.0000,
+                        0.0796, 0.1603, 0.2453, 0.3487, 0.4622, 0.5952, 0.7579, 1.0000]
 
     def __init__(self, n_bits=1):
         super(NormalFloat, self).__init__()
@@ -305,6 +305,68 @@ def NF_update(model, global_model, args):
                 param.data.copy_(layer_quant_conv(param.data, g_params[name].data)) 
             elif "downsample.0.weight" in name:
                 quant_conv1x1 = NormalFloat(n_bits=args.quantizer.wt_bit)
+                param.data.copy_(quant_conv1x1(param.data, g_params[name].data)) 
+                
+                
+class E2M1(nn.Module):
+    bit4 = [-1.0, -0.6667, -0.5, -0.3333, -0.25, -0.1667, -0.0833, 0.,
+            0.0833, 0.1667, 0.25, 0.3333, 0.5, 0.6667, 1.0]
+
+    def __init__(self, n_bits=1, clip_prob=-1):
+        super(E2M1, self).__init__()
+
+        q_values = torch.tensor(getattr(self, f'bit{n_bits}'), dtype=torch.float32)
+        self.q_values = torch.sort(q_values).values
+        self.edges = 0.5 * (self.q_values[1:] + self.q_values[:-1])
+        self.clip_prob = clip_prob
+        
+    def clip_by_prob(self, x):
+        abs_x_flat = x.flatten().abs()
+        topk = max(1, int(self.clip_prob * abs_x_flat.size(-1)))
+        thresholds = torch.topk(abs_x_flat, topk, dim=1, largest=True, sorted=True).values[-1]
+
+        # Clip values in parallel
+        clipped_x = torch.where(
+            x > thresholds, thresholds,
+            torch.where(x < -thresholds, -thresholds, x)
+        )
+
+        return clipped_x
+
+    def forward(self, x, global_x):
+        residual = x - global_x
+        residual_flatten = residual.view(-1)
+        
+        if self.clip_prob > 0:
+            x = self.clip_by_prob(x)
+        
+        absmax = torch.max(torch.abs(residual_flatten))
+        if absmax < 1e-12:
+            return torch.zeros_like(residual_flatten), torch.zeros_like(residual), global_x.clone()
+
+        normalized_residual = residual / absmax
+        indices = torch.bucketize(normalized_residual, self.edges, right=False)
+        quantized_residual = self.q_values[indices]
+        
+        updated_global_tensor = global_x + quantized_residual * absmax
+
+        return updated_global_tensor
+
+
+def E2M1_update(model, global_model, args):
+    
+    g_params = dict(global_model.named_parameters())
+        
+    for name, param in model.named_parameters():
+        if hasattr(args.quantizer, 'keyword'):
+            if 'first-last' in args.quantizer.keyword and name == 'conv1.weight':
+                first_quant_conv = E2M1(n_bits=args.quantizer.wt_bitb, clip_prob=args.quantizer.wt_clip_prob)
+                param.data.copy_(first_quant_conv(param.data, g_params[name].data)) 
+            elif name != "conv1.weight" and ("conv1.weight" in name or "conv2.weight" in name):
+                layer_quant_conv = E2M1(n_bits=args.quantizer.wt_bit, clip_prob=args.quantizer.wt_clip_prob)
+                param.data.copy_(layer_quant_conv(param.data, g_params[name].data)) 
+            elif "downsample.0.weight" in name:
+                quant_conv1x1 = E2M1(n_bits=args.quantizer.wt_bit, clip_prob=args.quantizer.wt_clip_prob)
                 param.data.copy_(quant_conv1x1(param.data, g_params[name].data)) 
 
 

@@ -22,7 +22,7 @@ batch_size: 100
 save_test: False 
 
 ## Resume
-load_model_path: False      # ====> may be like ./checkpoints/CIFAR100/iid/iid_base/res18.pt. use command line +load_model_path=(path)
+load_model_path: False      # ====> may be like ./checkpoints/CIFAR100/iid/iid_base/res18.pt. use command line +load_model_path=(path) './res18.pt.e500'
 wandb_resume_id: False
 
 ###### wandb && logging ######
