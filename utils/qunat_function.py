@@ -152,8 +152,10 @@ class _WSQConv2d(nn.Module):
 class WSQConv2d(nn.Module):
     # bit4 = [-0.7135, -0.5307, -0.4055, -0.3090, -0.2242, -0.1462, -0.0722, 0.,
     #         0.0619, 0.1250, 0.1904,	0.2598, 0.3356, 0.4215, 0.5291, 0.7122]
-    bit4 = [-0.8587, -0.6386, -0.4880, -0.3718, -0.2698, -0.1760, -0.0869, 0.,
-            0.0745, 0.1504, 0.2291, 0.3127, 0.4039, 0.5073, 0.6368, 0.8572]
+    # bit4 = [-0.8587, -0.6386, -0.4880, -0.3718, -0.2698, -0.1760, -0.0869, 0.,
+    #         0.0745, 0.1504, 0.2291, 0.3127, 0.4039, 0.5073, 0.6368, 0.8572]
+    bit4 = [-2.6536, -1.9735, -1.508, -1.149, -0.8337, -0.5439, -0.2686, 0.,
+            0.2303, 0.4648, 0.7081, 0.9663, 1.2481, 1.5676, 1.9679, 2.6488]
 
     def __init__(self, n_bits=1, clip_prob=0.001):
         super(WSQConv2d, self).__init__()
@@ -173,12 +175,13 @@ class WSQConv2d(nn.Module):
             clip_threshold = torch.kthvalue(x_abs.view(-1), k).values
             x_clipped = torch.clamp(x, min=-clip_threshold, max=clip_threshold)
 
-            # x_std = x.std().view(1, 1, 1, 1) * 0.95
-            x = x_clipped / clip_threshold
+            x_std = x_clipped.std().view(1, 1, 1, 1)
+            x = x_clipped / x_std
+            # x = x_clipped / clip_threshold
 
             indices = torch.bucketize(x, self.edges, right=False)
             quantized_x = self.q_values[indices]
-            dequantized_x = clip_threshold * quantized_x
+            dequantized_x = x_std * quantized_x
             
             updated_global_x = global_x + dequantized_x
             
