@@ -1,10 +1,10 @@
 CUDA_VISIBLE_DEVICES=0
-DATASET=cifar100
+DATASET=tinyimagenet
 BATCH_SIZE=50
 if [ ${DATASET} = "tinyimagenet" ];then
     BATCH_SIZE=100
 fi 
-ALPHA=0.05
+ALPHA=0.3
 DEVICE=1
 
 python3 federated_train.py client=Won server=base visible_devices=\'$DEVICE\' exp_name=FedAvgWonV2_$ALPHA \

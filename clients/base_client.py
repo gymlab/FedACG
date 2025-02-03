@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 from clients.build import CLIENT_REGISTRY
 
-from utils.qunat_function import AQD_update , PAQ_update, WSQ_update, HQ_update, NF_update
+from utils.qunat_function import AQD_update , PAQ_update, WSQ_update, HQ_update, NF_update, E2M1_update
 
 
 @CLIENT_REGISTRY.register()
@@ -181,12 +181,12 @@ class Client():
         
         # import os
         # for name, param in self.model.named_parameters():
-        #     if 'conv2.weight' in name:
+        #     if 'conv' in name or 'downsample' in name:
         #         residual = param.data - g[name].data
         
         #         os.makedirs('./tmp', exist_ok=True)
         #         residual = residual.cpu().numpy()
-        #         save_path = (f'./tmp/diff_{name}_0.05.npy')
+        #         save_path = (f'./tmp/diff_{name}_0.3.npy')
         #         np.save(save_path, residual)
         
         # Quantization
@@ -201,6 +201,9 @@ class Client():
                 local_error = HQ_update(self, self.model, self.global_model, self.args)
             elif self.args.quantizer.name == "NF":
                 NF_update(self.model, self.global_model, self.args)
+            elif self.args.quantizer.name == "E2M1":
+                E2M1_update(self.model, self.global_model, self.args)
+                
         
         loss_dict = {
             f'loss/{self.args.dataset.name}': loss_meter.avg,

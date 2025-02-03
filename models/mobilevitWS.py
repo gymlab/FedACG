@@ -344,4 +344,4 @@ class MobileViT_Net(nn.Module):
 class MobileViTWS(MobileViT_Net):
     
     def __init__(self, args: DictConfig, num_classes: int = 10, **kwargs):
-        super().__init__((32, 32), "x_small", num_classes=num_classes, patch_size=(2,2))
+        super().__init__((32, 32), "small", num_classes=num_classes, patch_size=(2,2))
