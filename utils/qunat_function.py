@@ -150,12 +150,14 @@ class _WSQConv2d(nn.Module):
     
     
 class WSQConv2d(nn.Module):
-    bit2 = [-1.224, 0., 0.7646, 1.7242]
-    bit3 = [-2.0334, -1.1882, -0.5606, 0., 0.4436, 0.9188, 1.4764, 2.2547]
-    bit4 = [-2.5, -1.9099, -1.4837, -1.1324, -0.8224, -0.5368, -0.2652, 0.,
-            0.2318, 0.4678, 0.7129, 0.9732, 1.2576, 1.5808, 1.9712, 2.5]
+    # bit4 = [-0.7135, -0.5307, -0.4055, -0.3090, -0.2242, -0.1462, -0.0722, 0.,
+    #         0.0619, 0.1250, 0.1904,	0.2598, 0.3356, 0.4215, 0.5291, 0.7122]
+    # bit4 = [-0.8587, -0.6386, -0.4880, -0.3718, -0.2698, -0.1760, -0.0869, 0.,
+    #         0.0745, 0.1504, 0.2291, 0.3127, 0.4039, 0.5073, 0.6368, 0.8572]
+    bit4 = [-2.6536, -1.9735, -1.508, -1.149, -0.8337, -0.5439, -0.2686, 0.,
+            0.2303, 0.4648, 0.7081, 0.9663, 1.2481, 1.5676, 1.9679, 2.6488]
 
-    def __init__(self, n_bits=1, clip_prob=0.05):
+    def __init__(self, n_bits=1, clip_prob=0.001):
         super(WSQConv2d, self).__init__()
         
         q_values = torch.tensor(getattr(self, f'bit{n_bits}'), dtype=torch.float32)
@@ -167,27 +169,23 @@ class WSQConv2d(nn.Module):
         with torch.no_grad():
             x = x - global_x    # residual
             
-            x_mean = x.mean().view(-1, 1, 1, 1)
-            x = x - x_mean
-            
             # clip: V11
             x_abs = torch.abs(x)
             k = int((1 - self.clip_prob) * x_abs.numel())
             clip_threshold = torch.kthvalue(x_abs.view(-1), k).values
             x_clipped = torch.clamp(x, min=-clip_threshold, max=clip_threshold)
-            x_std = x_clipped.std().view(1, 1, 1, 1)
 
-            # x_std = x.std().view(1, 1, 1, 1) * 0.95
-            x = x / x_std.expand_as(x)
+            x_std = x_clipped.std().view(1, 1, 1, 1)
+            x = x_clipped / x_std
+            # x = x_clipped / clip_threshold
 
             indices = torch.bucketize(x, self.edges, right=False)
             quantized_x = self.q_values[indices]
-            dequantized_x = quantized_x * x_std + x_mean
+            dequantized_x = x_std * quantized_x
             
             updated_global_x = global_x + dequantized_x
             
         return updated_global_x
-
 
 
 def WSQ_update(model, global_model, args):
@@ -262,10 +260,10 @@ def quantize_and_dequantize(tensor, global_tensor, bit_width, lr=1.0, flag = Fal
 
 
 class NormalFloat(nn.Module):
-    bit2 = [-1., 0., 0.3339, 1.]
-    bit3 = [-1., -0.4733, -0.2145, 0., 0.1589, 0.3339, 0.5568, 1.]
-    bit4 = [-1., -0.6901, -0.5195, -0.3903, -0.2810, -0.1825, -0.0899, 0.,
-            0.0786, 0.1589, 0.2431, 0.3339, 0.4357, 0.5568, 0.7170, 1.]
+    bit2 = [-0.6814, 0., 0.2788, 0.6814]
+    bit3 = [-0.8267, -0.4347, -0.2, 0., 0.1694, 0.3586, 0.6116, 0.8267]
+    bit4 = [-1.0000, -0.6962, -0.5257, -0.3946, -0.2849, -0.1892, -0.0931, 0.0000,
+                        0.0796, 0.1603, 0.2453, 0.3487, 0.4622, 0.5952, 0.7579, 1.0000]
 
     def __init__(self, n_bits=1):
         super(NormalFloat, self).__init__()
@@ -305,6 +303,68 @@ def NF_update(model, global_model, args):
                 param.data.copy_(layer_quant_conv(param.data, g_params[name].data)) 
             elif "downsample.0.weight" in name:
                 quant_conv1x1 = NormalFloat(n_bits=args.quantizer.wt_bit)
+                param.data.copy_(quant_conv1x1(param.data, g_params[name].data)) 
+                
+                
+class E2M1(nn.Module):
+    bit4 = [-1.0, -0.6667, -0.5, -0.3333, -0.25, -0.1667, -0.0833, 0.,
+            0.0833, 0.1667, 0.25, 0.3333, 0.5, 0.6667, 1.0]
+
+    def __init__(self, n_bits=1, clip_prob=-1):
+        super(E2M1, self).__init__()
+
+        q_values = torch.tensor(getattr(self, f'bit{n_bits}'), dtype=torch.float32)
+        self.q_values = torch.sort(q_values).values
+        self.edges = 0.5 * (self.q_values[1:] + self.q_values[:-1])
+        self.clip_prob = clip_prob
+        
+    def clip_by_prob(self, x):
+        abs_x_flat = x.flatten().abs()
+        topk = max(1, int(self.clip_prob * abs_x_flat.size(-1)))
+        thresholds = torch.topk(abs_x_flat, topk, dim=1, largest=True, sorted=True).values[-1]
+
+        # Clip values in parallel
+        clipped_x = torch.where(
+            x > thresholds, thresholds,
+            torch.where(x < -thresholds, -thresholds, x)
+        )
+
+        return clipped_x
+
+    def forward(self, x, global_x):
+        residual = x - global_x
+        residual_flatten = residual.view(-1)
+        
+        if self.clip_prob > 0:
+            x = self.clip_by_prob(x)
+        
+        absmax = torch.max(torch.abs(residual_flatten))
+        if absmax < 1e-12:
+            return torch.zeros_like(residual_flatten), torch.zeros_like(residual), global_x.clone()
+
+        normalized_residual = residual / absmax
+        indices = torch.bucketize(normalized_residual, self.edges, right=False)
+        quantized_residual = self.q_values[indices]
+        
+        updated_global_tensor = global_x + quantized_residual * absmax
+
+        return updated_global_tensor
+
+
+def E2M1_update(model, global_model, args):
+    
+    g_params = dict(global_model.named_parameters())
+        
+    for name, param in model.named_parameters():
+        if hasattr(args.quantizer, 'keyword'):
+            if 'first-last' in args.quantizer.keyword and name == 'conv1.weight':
+                first_quant_conv = E2M1(n_bits=args.quantizer.wt_bitb, clip_prob=args.quantizer.wt_clip_prob)
+                param.data.copy_(first_quant_conv(param.data, g_params[name].data)) 
+            elif name != "conv1.weight" and ("conv1.weight" in name or "conv2.weight" in name):
+                layer_quant_conv = E2M1(n_bits=args.quantizer.wt_bit, clip_prob=args.quantizer.wt_clip_prob)
+                param.data.copy_(layer_quant_conv(param.data, g_params[name].data)) 
+            elif "downsample.0.weight" in name:
+                quant_conv1x1 = E2M1(n_bits=args.quantizer.wt_bit, clip_prob=args.quantizer.wt_clip_prob)
                 param.data.copy_(quant_conv1x1(param.data, g_params[name].data)) 
 
 

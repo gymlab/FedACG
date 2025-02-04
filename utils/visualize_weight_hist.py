@@ -5,7 +5,7 @@ from scipy.stats import skew, kurtosis, entropy, norm, laplace, wasserstein_dist
 import torch
 import torch.nn as nn
 
-alpha = '0.1'
+alpha = '0.3'
 
 def clip_by_prob(x, clip_ratio=0.05):
     """
@@ -29,7 +29,7 @@ def clip_by_prob(x, clip_ratio=0.05):
     # Clip values based on the threshold
     clipped_x = np.clip(x, a_min=-threshold, a_max=threshold)
 
-    return clipped_x
+    return clipped_x, threshold
 
 def load_and_normalize_data(file_paths):
     """
@@ -47,15 +47,21 @@ def load_and_normalize_data(file_paths):
         layer_name = os.path.basename(file_path).replace("_weight_diff.npy", "")
         weight_diff_data = np.load(file_path)  # Load saved .npy file
         layer_data = weight_diff_data.flatten()  # Flatten the entire layer data
+        # mean = np.mean(layer_data)
+        clipped_data, th = clip_by_prob(layer_data.copy(), 0.001)
+        layer_data = clipped_data
         mean = np.mean(layer_data)
-        # clipped_data = clip_by_prob(layer_data.copy())
         # std = np.std(clipped_data)
-        std = np.std(layer_data) * 0.95
+        std = np.std(layer_data)
+        print(f"{file_path}: mean: {mean:.8f}, std: {std:.8f}, edge: {th / std:.4f}")
+        maxabs = np.max(np.abs(layer_data))
 
-        if std > 0:  # Avoid division by zero
-            normalized_data = (layer_data - mean) / std
-        else:
-            normalized_data = layer_data  # No normalization if std is 0
+        # if std > 0:  # Avoid division by zero
+        #     normalized_data = (layer_data - mean) / std
+        # else:
+        #     normalized_data = layer_data  # No normalization if std is 0
+        # normalized_data = layer_data / maxabs
+        normalized_data = layer_data / std
 
         normalized_data_dict[layer_name] = normalized_data
 
@@ -116,6 +122,15 @@ def plot_layer_histograms(normalized_data_dict, output_dir="normalized_histogram
         ax.hist(
             data, bins=100, alpha=0.7, density=True, label=f"Skew: {layer_skewness:.2f}\nKurt: {layer_kurtosis:.2f}\nKL: {kl_divergence:.2f}\nW: {wasserstein_dist:.2f}", edgecolor='black'
         )
+        
+        # NF4_VALUES = np.array([-1.0000, -0.6962, -0.5257, -0.3946, -0.2849, -0.1892, -0.0931, 0.0000,
+        #                 0.0796, 0.1603, 0.2453, 0.3487, 0.4622, 0.5952, 0.7579, 1.0000])
+        NF4_VALUES = np.array([-2.6436, -1.9735, -1.5080, -1.1490, -0.8337, -0.5439, -0.2686, 0.,
+                               0.2303, 0.4648, 0.7081, 0.9663, 1.2481, 1.5676, 1.9676, 2.6488])
+
+        for nf in NF4_VALUES:
+            # 클리핑 threshold 위치에 세로선 추가
+            ax.axvline(x=nf*1.88, color='green', linestyle='--', linewidth=1.5)
 
         # Plot standard normal distribution
         x = np.linspace(-4, 4, 1000)
@@ -151,10 +166,26 @@ def process_multiple_files(file_paths, output_dir="normalized_histograms"):
 
 if __name__ == '__main__':
     file_paths = [
+        f"./tmp/diff_conv1.weight_{alpha}.npy",
         f"./tmp/diff_layer1.0.conv2.weight_{alpha}.npy",
         f"./tmp/diff_layer2.0.conv2.weight_{alpha}.npy",
         f"./tmp/diff_layer3.0.conv2.weight_{alpha}.npy",
-        f"./tmp/diff_layer4.0.conv2.weight_{alpha}.npy"
+        f"./tmp/diff_layer4.0.conv2.weight_{alpha}.npy",
+        f"./tmp/diff_layer1.0.conv1.weight_{alpha}.npy",
+        f"./tmp/diff_layer2.0.conv1.weight_{alpha}.npy",
+        f"./tmp/diff_layer3.0.conv1.weight_{alpha}.npy",
+        f"./tmp/diff_layer4.0.conv1.weight_{alpha}.npy",
+        f"./tmp/diff_layer1.1.conv2.weight_{alpha}.npy",
+        f"./tmp/diff_layer2.1.conv2.weight_{alpha}.npy",
+        f"./tmp/diff_layer3.1.conv2.weight_{alpha}.npy",
+        f"./tmp/diff_layer4.1.conv2.weight_{alpha}.npy",
+        f"./tmp/diff_layer1.1.conv1.weight_{alpha}.npy",
+        f"./tmp/diff_layer2.1.conv1.weight_{alpha}.npy",
+        f"./tmp/diff_layer3.1.conv1.weight_{alpha}.npy",
+        f"./tmp/diff_layer4.1.conv1.weight_{alpha}.npy",
+        f"./tmp/diff_layer2.0.downsample.0.weight_0.3.npy",
+        f"./tmp/diff_layer3.0.downsample.0.weight_0.3.npy",
+        f"./tmp/diff_layer4.0.downsample.0.weight_0.3.npy",
     ]  # Replace with your file paths
     output_histogram_directory = "./tmp"
     process_multiple_files(file_paths, output_dir=output_histogram_directory)
