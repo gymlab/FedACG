@@ -209,7 +209,7 @@ class WSQGConv2d(nn.Module):
     bit4 = [-2.6536, -1.9735, -1.508, -1.149, -0.8337, -0.5439, -0.2686, 0.,
             0.2303, 0.4648, 0.7081, 0.9663, 1.2481, 1.5676, 1.9679, 2.6488]
 
-    def __init__(self, n_bits=1, clip_prob=0.001):
+    def __init__(self, n_bits=1, clip_prob=-1):
         super(WSQGConv2d, self).__init__()
         
         q_values = torch.tensor(getattr(self, f'bit{n_bits}'), dtype=torch.float32)
@@ -220,6 +220,14 @@ class WSQGConv2d(nn.Module):
     def forward(self, x, global_x, std):
         with torch.no_grad():
             x = x - global_x    # residual
+            
+            # clip: V11
+            if self.clip_prob > 0:
+                x_abs = torch.abs(x)
+                k = int((1 - self.clip_prob) * x_abs.numel())
+                clip_threshold = torch.kthvalue(x_abs.view(-1), k).values
+                x = torch.clamp(x, min=-clip_threshold, max=clip_threshold)
+            
             local_std = x.std()
             x = x / std
             # x = x_clipped / clip_threshold

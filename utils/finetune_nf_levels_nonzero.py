@@ -35,7 +35,7 @@ def refined_error_search(q_values, q_ranges=None, steps=10, se=3.1):
 
     for k, q in enumerate(q_combinations):
         q = np.array(sorted(set(q)))
-        q = np.insert(q, 0, 0)  # L+1   [0, q1, ..., qL]
+        q = np.insert(q, 0, 0)      # L+1   [0, q1, ..., qL]
 
         q_minus = q[:-1] - q[1:]    # L [-q1, q1-q2, ..., qL-1 - qL]
         q_plus = q[:-1] + q[1:]     # L [q1, q1+q2, ..., qL-1 + qL]
