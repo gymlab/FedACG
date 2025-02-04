@@ -35,17 +35,15 @@ def refined_error_search(q_values, q_ranges=None, steps=10, se=3.1):
 
     for k, q in enumerate(q_combinations):
         q = np.array(sorted(set(q)))
-        q = np.insert(q, 0, 0)      # L+1   [0, q1, ..., qL]
 
-        q_minus = q[:-1] - q[1:]    # L [-q1, q1-q2, ..., qL-1 - qL]
-        q_plus = q[:-1] + q[1:]     # L [q1, q1+q2, ..., qL-1 + qL]
-        s = q_plus * 0.5            # L [q1/2, (q1+q2)/2, ..., (qL-1 + qL)/2]
-                                    # L [s1, s2, ..., sL]
+        q_minus = q[:-1] - q[1:]    # L-1  [q1-q2, ..., qL-1 - qL]
+        q_plus = q[:-1] + q[1:]     # L-1  [q1+q2, ..., qL-1 + qL]
+        s = q_plus * 0.5            # L-1 [(q1+q2)/2, ..., (qL-1 + qL)/2]
+        s = np.insert(s, 0, 0)      # L [0, (q1+q2)/2, ..., (qL-1 + qL)/2]
         q_square_diff = q_minus * q_plus
 
-        total_error = np.sqrt(2. / np.pi) * (np.sum(q_minus[1:] * np.exp(-0.5 * (s[1:] ** 2))) - q[1] * np.exp(-0.5 * (s[0] ** 2))) \
-                        + 0.5 * (np.sum(q_square_diff[1:] * special.erf(s[1:] / np.sqrt(2))) 
-                                 - (q[1]**2) * special.erf(s[0] / np.sqrt(2)) + (q[-1] ** 2 + 1))
+        total_error = np.sqrt(2. / np.pi) * (np.sum(q_minus * np.exp(-0.5 * (s[1:] ** 2))) - q[0]) \
+                        + 0.5 * (np.sum(q_square_diff * special.erf(s[1:] / np.sqrt(2)))  + (q[-1] ** 2 + 1))
 
         if total_error < min_error:
             min_error = total_error
@@ -60,24 +58,24 @@ def refined_error_search(q_values, q_ranges=None, steps=10, se=3.1):
     return optimized_q_values, min_error
 
 # Example usage
-q_values = [0.2686, 0.5439, 0.8337, 1.1490, 1.5080, 1.9735, 2.6536]  # Initial q_values
+q_values = [0.1284, 0.3881, 0.6568, 0.9424, 1.2563, 1.6181, 2.0691, 2.327]  # Initial q_values
 # q_values = [0.2303, 0.4648, 0.7081, 0.9663, 1.2481, 1.5676, 1.9676, 2.6488]  # Initial q_values
 
-# q_ranges = [(0.0001, 0.3999), (0.2001, 0.5999),
-#             (0.4001, 0.7999), (0.6001, 0.9999),
-#             (0.8001, 1.1999), (1.0001, 1.3999),
-#             (1.2001, 1.7999), (1.4001, 3.1)]
-q_ranges = [(0.0001, 0.3499), (0.2001, 0.5499),
-            (0.3501, 0.7499), (0.5501, 0.9999),
-            (0.7501, 1.2999), (1.0001, 1.7999),
-            (1.3001, 3.1)]
+# q_ranges = [(0.005, 0.25), (0.2001, 0.4),
+#             (0.4001, 0.7), (0.7, 1.0),
+#             (1.0, 1.3), (1.3, 1.5),
+#             (1.7, 1.9), (2.0, 3.1)]
+# q_ranges = [(0.0001, 0.3499), (0.2001, 0.5499),
+#             (0.3501, 0.7499), (0.5501, 0.9999),
+#             (0.7501, 1.2999), (1.0001, 1.7999),
+#             (1.3001, 3.1)]
 
-steps = 7
-refined_range = 0.1/400
+steps = 5
+refined_range = 0.0002
 
 q_ranges = []
 for i, q in enumerate(q_values):
     q_ranges.append((q-refined_range, q+refined_range))
-# q_ranges[-1] = (2.5, 2.7)
+# q_ranges[-1] = (2.5, 2.8)
 
 optimized_q_values, min_error = refined_error_search(q_values, q_ranges, steps)
