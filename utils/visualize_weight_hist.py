@@ -49,7 +49,7 @@ def load_and_normalize_data(file_paths):
         layer_data = weight_diff_data.flatten()  # Flatten the entire layer data
         # mean = np.mean(layer_data)
         clipped_data, th = clip_by_prob(layer_data.copy(), 0.0001)
-        layer_data = clipped_data
+        # layer_data = clipped_data
         mean = np.mean(layer_data)
         # std = np.std(clipped_data)
         std = np.std(layer_data)
@@ -123,14 +123,22 @@ def plot_layer_histograms(normalized_data_dict, output_dir="normalized_histogram
             data, bins=100, alpha=0.7, density=True, label=f"Skew: {layer_skewness:.2f}\nKurt: {layer_kurtosis:.2f}\nKL: {kl_divergence:.2f}\nW: {wasserstein_dist:.2f}", edgecolor='black'
         )
         
+        maxabs = np.max(np.abs(data))
+        
         # NF4_VALUES = np.array([-1.0000, -0.6962, -0.5257, -0.3946, -0.2849, -0.1892, -0.0931, 0.0000,
         #                 0.0796, 0.1603, 0.2453, 0.3487, 0.4622, 0.5952, 0.7579, 1.0000])
         NF4_VALUES = np.array([-2.6436, -1.9735, -1.5080, -1.1490, -0.8337, -0.5439, -0.2686, 0.,
                                0.2303, 0.4648, 0.7081, 0.9663, 1.2481, 1.5676, 1.9676, 2.6488])
+        NF4_VALUES2 = np.array([-1.0000, -0.6962, -0.5257, -0.3946, -0.2849, -0.1892, -0.0931, 0.0000,
+                        0.0796, 0.1603, 0.2453, 0.3487, 0.4622, 0.5952, 0.7579, 1.0000]) * maxabs
         
         for nf in NF4_VALUES:
             # 클리핑 threshold 위치에 세로선 추가
             ax.axvline(x=nf, color='green', linestyle='--', linewidth=1.5)
+            
+        for nf in NF4_VALUES2:
+            # 클리핑 threshold 위치에 세로선 추가
+            ax.axvline(x=nf, color='orange', linestyle='--', linewidth=1.5)
 
         # Plot standard normal distribution
         x = np.linspace(-4, 4, 1000)
