@@ -254,6 +254,9 @@ class Trainer():
                                                             epoch=epoch if self.args.server.get('AnalizeServer') else None)
 
             self.model.load_state_dict(updated_global_state_dict)
+            
+            if self.args.quantizer.name == "WSQG":
+                self.model.update_all_global_std(self.args.quantizer.momentum)
 
             if self.args.eval.freq > 0 and epoch % self.args.eval.freq == 0:
                 self.evaluate(epoch=epoch)

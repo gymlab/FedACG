@@ -26,6 +26,8 @@ class WSConv2d(nn.Conv2d):
         self.rho = rho
         self.init_mode = init_mode
         self._reset_parameters()
+        self.global_std = nn.Parameter(torch.tensor(1e-3, dtype=torch.float32))
+        self.local_std = nn.Parameter(torch.tensor(1e-3, dtype=torch.float32))
         
     # TODO: Check!
     def _reset_parameters(self):
@@ -35,6 +37,12 @@ class WSConv2d(nn.Conv2d):
             init.kaiming_normal_(self.weight)
         else:
             raise ValueError(f"{self.init_mode} is not supported.")
+        
+    def set_std(self, std):
+        self.local_std.data = torch.full_like(self.local_std.data, std)
+        
+    def update_global_std(self, momentum=0.1):
+        self.global_std.data = self.global_std.data * (1. - momentum) + self.local_std.data * momentum
 
     def forward(self, x):
         weight = self.weight
@@ -177,6 +185,12 @@ class ResNet_WSConv(nn.Module):
             self.fc = Linear(last_feature_dim * block.expansion, num_classes, bias=False)
         else:
             self.fc = Linear(last_feature_dim * block.expansion, num_classes)
+            
+    def update_all_global_std(self, momentum=0.1):
+        """모델 내부의 모든 WSConv2d 레이어에서 update_global_std() 호출"""
+        for module in self.modules():  # self.modules()를 사용하면 모델의 모든 서브모듈을 가져옴
+            if isinstance(module, WSConv2d):  # WSConv2d인 경우
+                module.update_global_std(momentum)
     
     def set_rho(self, rho):
         self.conv1.rho
