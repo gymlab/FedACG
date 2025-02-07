@@ -58,7 +58,7 @@ def refined_error_search(q_values, q_ranges=None, steps=10, se=3.1):
     return optimized_q_values, min_error
 
 # Example usage
-q_values = [0.1284, 0.3881, 0.6568, 0.9424, 1.2563, 1.6181, 2.0691, 2.327]  # Initial q_values
+q_values = [0.1284, 0.3881, 0.6568, 0.9424, 1.2563, 1.6181, 2.0691, 2.7327]  # Initial q_values
 # q_values = [0.2303, 0.4648, 0.7081, 0.9663, 1.2481, 1.5676, 1.9676, 2.6488]  # Initial q_values
 
 # q_ranges = [(0.005, 0.25), (0.2001, 0.4),
@@ -69,13 +69,14 @@ q_values = [0.1284, 0.3881, 0.6568, 0.9424, 1.2563, 1.6181, 2.0691, 2.327]  # In
 #             (0.3501, 0.7499), (0.5501, 0.9999),
 #             (0.7501, 1.2999), (1.0001, 1.7999),
 #             (1.3001, 3.1)]
+q_ranges = [(0.0001, 4.0)]
 
-steps = 5
+steps = 40000
 refined_range = 0.0002
 
-q_ranges = []
-for i, q in enumerate(q_values):
-    q_ranges.append((q-refined_range, q+refined_range))
-# q_ranges[-1] = (2.5, 2.8)
+# q_ranges = []
+# for i, q in enumerate(q_values):
+#     q_ranges.append((q-refined_range, q+refined_range))
+# # q_ranges[-1] = (2.5, 2.8)
 
 optimized_q_values, min_error = refined_error_search(q_values, q_ranges, steps)
