@@ -1,4 +1,4 @@
-name: "E2M1"
+name: "WSQLG"
 uplink: True
 downlink: False
 
@@ -6,3 +6,4 @@ downlink: False
 keyword: []
 wt_bit: 8
 wt_clip_prob: -1
+momentum: 0.1
