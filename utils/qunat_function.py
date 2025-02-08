@@ -477,6 +477,7 @@ class E2M1(nn.Module):
 
         q_values = torch.tensor(getattr(self, f'bit{n_bits}'), dtype=torch.float32)
         self.q_values = torch.sort(q_values).values
+        self.q_values = self.q_values / torch.max(self.q_values)
         self.edges = 0.5 * (self.q_values[1:] + self.q_values[:-1])
         self.clip_prob = clip_prob
 
@@ -490,8 +491,7 @@ class E2M1(nn.Module):
             k = int((1 - self.clip_prob) * x_abs.numel())
             clip_threshold = torch.kthvalue(x_abs.view(-1), k).values
             x = torch.clamp(x, min=-clip_threshold, max=clip_threshold)
-            
-        
+
         absmax = torch.max(torch.abs(residual_flatten))
         if absmax < 1e-12:
             return torch.zeros_like(residual_flatten), torch.zeros_like(residual), global_x.clone()
