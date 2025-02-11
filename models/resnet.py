@@ -12,10 +12,26 @@ import torchvision
 from models.build import ENCODER_REGISTRY
 
 
+class Conv2d(nn.Conv2d):
+
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1,
+                 padding=0, dilation=1, groups=1, bias=True):
+        super(Conv2d, self).__init__(in_channels, out_channels, kernel_size, stride,
+                 padding, dilation, groups, bias)
+        self.global_std = nn.Parameter(torch.tensor(1e-3, dtype=torch.float32))
+        self.local_std = nn.Parameter(torch.tensor(1e-3, dtype=torch.float32))
+
+    def set_std(self, std):
+        self.local_std.data = torch.full_like(self.local_std.data, std)
+        
+    def update_global_std(self, momentum=0.1):
+        self.global_std.data = self.global_std.data * (1. - momentum) + self.local_std.data * momentum
+
+
 class BasicBlock(nn.Module):
     expansion = 1
 
-    def __init__(self, in_planes, planes, stride=1, use_bn_layer=False, Conv2d=nn.Conv2d):
+    def __init__(self, in_planes, planes, stride=1, use_bn_layer=False, Conv2d=Conv2d):
         super(BasicBlock, self).__init__()
         self.conv1 = Conv2d(
             in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
@@ -57,7 +73,7 @@ class BasicBlock(nn.Module):
 class Bottleneck(nn.Module):
     expansion = 4
 
-    def __init__(self, in_planes, planes, stride=1, use_bn_layer=False, Conv2d=nn.Conv2d):
+    def __init__(self, in_planes, planes, stride=1, use_bn_layer=False, Conv2d=Conv2d):
         super(Bottleneck, self).__init__()
         self.conv1 = Conv2d(in_planes, planes, kernel_size=1, bias=False)
         self.bn1 = nn.GroupNorm(2, planes) if not use_bn_layer else nn.BatchNorm2d(planes)
@@ -130,7 +146,7 @@ class ResNet(nn.Module):
 
 
     def get_conv(self):
-        return nn.Conv2d
+        return Conv2d
     
     def get_linear(self):
         return nn.Linear
@@ -142,6 +158,12 @@ class ResNet(nn.Module):
             layers.append(block(self.in_planes, planes, stride, use_bn_layer=use_bn_layer, Conv2d=self.get_conv()))
             self.in_planes = planes * block.expansion
         return nn.Sequential(*layers)
+    
+    def update_all_global_std(self, momentum=0.1):
+        """모델 내부의 모든 WSConv2d 레이어에서 update_global_std() 호출"""
+        for module in self.modules():  # self.modules()를 사용하면 모델의 모든 서브모듈을 가져옴
+            if isinstance(module, Conv2d):  # WSConv2d인 경우
+                module.update_global_std(momentum)
 
     def forward(self, x, return_feature=False):
         out = F.relu(self.bn1(self.conv1(x)))
