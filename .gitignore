@@ -12,3 +12,7 @@ outputs/
 ./tmp/
 tmp/
 tmp
+2d_plots
+2d_plots/
+3d_plots
+3d_plots/
