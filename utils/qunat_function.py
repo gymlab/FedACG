@@ -287,7 +287,6 @@ def WSQG_update(model, global_model, wt_bit, args):
                 param.data.copy_(std)
 
 
-
 class WSQLGConv2d(nn.Module):
     # bit4 = [-2.6536, -1.9735, -1.508, -1.149, -0.8337, -0.5439, -0.2686, 0.,
     #         0.2303, 0.4648, 0.7081, 0.9663, 1.2481, 1.5676, 1.9679, 2.6488]
