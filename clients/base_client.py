@@ -87,6 +87,12 @@ class Client():
             self.local_deltas = (kwargs['past_local_deltas'])
             self.user = kwargs['user']
             self.local_delta = copy.deepcopy(self.local_deltas[self.user])
+        
+        if self.args.quantizer.name != 'none':
+            if self.args.quantizer.random_bit == 'fixed_alloc' or self.args.quantizer.random_bit == 'rand_alloc':
+                self.wt_bit = kwargs['wt_bit']
+            else:
+                self.wt_bit = self.args.quantizer.wt_bit
 
     def _update_model(self, state_dict):
         self.model.load_state_dict(state_dict)
@@ -194,19 +200,19 @@ class Client():
             if self.args.quantizer.name == "AQD":
                 AQD_update(self.model, self.args)
             elif self.args.quantizer.name == "WSQ":
-                WSQ_update(self.model, self.global_model, self.args)
+                WSQ_update(self.model, self.global_model, self.wt_bit, self.args)
             elif self.args.quantizer.name == "PAQ":
                 PAQ_update(self.model, self.global_model, self.args)
             elif self.args.quantizer.name == "HQ":
                 local_error = HQ_update(self, self.model, self.global_model, self.args)
             elif self.args.quantizer.name == "NF":
-                NF_update(self.model, self.global_model, self.args)
+                NF_update(self.model, self.global_model, self.wt_bit, self.args)
             elif self.args.quantizer.name == "E2M1":
-                E2M1_update(self.model, self.global_model, self.args)
+                E2M1_update(self.model, self.global_model, self.wt_bit, self.args)
             elif self.args.quantizer.name == "WSQG":
-                WSQG_update(self.model, self.global_model, self.args)
+                WSQG_update(self.model, self.global_model, self.wt_bit, self.args)
             elif self.args.quantizer.name == "WSQLG":
-                WSQLG_update(self.model, self.global_model, self.args)
+                WSQLG_update(self.model, self.global_model, self.wt_bit, self.args)
         
         loss_dict = {
             f'loss/{self.args.dataset.name}': loss_meter.avg,

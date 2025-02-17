@@ -213,7 +213,7 @@ class TinyImageNet(data.Dataset):
                 self.label_data = np.zeros((self.samples_num,), dtype=np.int)
                 for idx in tqdm(range(self.samples_num), desc=load_desc):
                     s = self.samples[idx]
-                    img = imageio.imread(s[0])
+                    img = tst_lbl_list.imread(s[0])
                     img = _add_channels(img)
                     self.img_data[idx] = img
                     if split != 'test':
