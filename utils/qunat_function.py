@@ -190,20 +190,20 @@ class WSQConv2d(nn.Module):
         return updated_global_x
 
 
-def WSQ_update(model, global_model, args):
+def WSQ_update(model, global_model, wt_bit, args):
     
     g_params = dict(global_model.named_parameters())
     
     for name, param in model.named_parameters():
         if hasattr(args.quantizer, 'keyword'):
             if 'first-last' in args.quantizer.keyword and name == 'conv1.weight':
-                first_quant_conv = WSQConv2d(n_bits=args.quantizer.wt_bit, clip_prob=args.quantizer.wt_clip_prob)
+                first_quant_conv = WSQConv2d(n_bits=wt_bit, clip_prob=args.quantizer.wt_clip_prob)
                 param.data.copy_(first_quant_conv(param.data, g_params[name].data)) 
             elif name != "conv1.weight" and ("conv1.weight" in name or "conv2.weight" in name):
-                layer_quant_conv = WSQConv2d(n_bits=args.quantizer.wt_bit, clip_prob=args.quantizer.wt_clip_prob)
+                layer_quant_conv = WSQConv2d(n_bits=wt_bit, clip_prob=args.quantizer.wt_clip_prob)
                 param.data.copy_(layer_quant_conv(param.data, g_params[name].data)) 
             elif "downsample.0.weight" in name:
-                quant_conv1x1 = WSQConv2d(n_bits=args.quantizer.wt_bit, clip_prob=args.quantizer.wt_clip_prob)
+                quant_conv1x1 = WSQConv2d(n_bits=wt_bit, clip_prob=args.quantizer.wt_clip_prob)
                 param.data.copy_(quant_conv1x1(param.data, g_params[name].data))
                 
 
@@ -248,7 +248,7 @@ class WSQGConv2d(nn.Module):
         return updated_global_x, local_std
 
 
-def WSQG_update(model, global_model, args):
+def WSQG_update(model, global_model, wt_bit, args):
     
     g_params = dict(global_model.named_parameters())
     
@@ -263,17 +263,17 @@ def WSQG_update(model, global_model, args):
     for name, param in model.named_parameters():
         if hasattr(args.quantizer, 'keyword'):
             if 'first-last' in args.quantizer.keyword and name == 'conv1.weight':
-                first_quant_conv = WSQGConv2d(n_bits=args.quantizer.wt_bit, clip_prob=args.quantizer.wt_clip_prob)
+                first_quant_conv = WSQGConv2d(n_bits=wt_bit, clip_prob=args.quantizer.wt_clip_prob)
                 updated_param, local_std = first_quant_conv(param.data, g_params[name].data, global_std_values[name])
                 param.data.copy_(updated_param)
                 local_std_values[name] = local_std
             elif name != "conv1.weight" and ("conv1.weight" in name or "conv2.weight" in name):
-                layer_quant_conv = WSQGConv2d(n_bits=args.quantizer.wt_bit, clip_prob=args.quantizer.wt_clip_prob)
+                layer_quant_conv = WSQGConv2d(n_bits=wt_bit, clip_prob=args.quantizer.wt_clip_prob)
                 updated_param, local_std = layer_quant_conv(param.data, g_params[name].data, global_std_values[name])
                 param.data.copy_(updated_param)
                 local_std_values[name] = local_std
             elif "downsample.0.weight" in name:
-                quant_conv1x1 = WSQGConv2d(n_bits=args.quantizer.wt_bit, clip_prob=args.quantizer.wt_clip_prob)
+                quant_conv1x1 = WSQGConv2d(n_bits=wt_bit, clip_prob=args.quantizer.wt_clip_prob)
                 updated_param, local_std = quant_conv1x1(param.data, g_params[name].data, global_std_values[name])
                 param.data.copy_(updated_param)
                 local_std_values[name] = local_std
@@ -330,7 +330,7 @@ class WSQLGConv2d(nn.Module):
         return updated_global_x, local_std
 
 
-def WSQLG_update(model, global_model, args):
+def WSQLG_update(model, global_model, wt_bit, args):
     
     g_params = dict(global_model.named_parameters())
     
@@ -345,17 +345,17 @@ def WSQLG_update(model, global_model, args):
     for name, param in model.named_parameters():
         if hasattr(args.quantizer, 'keyword'):
             if 'first-last' in args.quantizer.keyword and name == 'conv1.weight':
-                first_quant_conv = WSQGConv2d(n_bits=args.quantizer.wt_bit, clip_prob=args.quantizer.wt_clip_prob)
+                first_quant_conv = WSQGConv2d(n_bits=wt_bit, clip_prob=args.quantizer.wt_clip_prob)
                 updated_param, local_std = first_quant_conv(param.data, g_params[name].data, global_std_values[name])
                 param.data.copy_(updated_param)
                 local_std_values[name] = local_std
             elif name != "conv1.weight" and ("conv1.weight" in name or "conv2.weight" in name):
-                layer_quant_conv = WSQGConv2d(n_bits=args.quantizer.wt_bit, clip_prob=args.quantizer.wt_clip_prob)
+                layer_quant_conv = WSQGConv2d(n_bits=wt_bit, clip_prob=args.quantizer.wt_clip_prob)
                 updated_param, local_std = layer_quant_conv(param.data, g_params[name].data, global_std_values[name])
                 param.data.copy_(updated_param)
                 local_std_values[name] = local_std
             elif "downsample.0.weight" in name:
-                quant_conv1x1 = WSQGConv2d(n_bits=args.quantizer.wt_bit, clip_prob=args.quantizer.wt_clip_prob)
+                quant_conv1x1 = WSQGConv2d(n_bits=wt_bit, clip_prob=args.quantizer.wt_clip_prob)
                 updated_param, local_std = quant_conv1x1(param.data, g_params[name].data, global_std_values[name])
                 param.data.copy_(updated_param)
                 local_std_values[name] = local_std
@@ -452,20 +452,20 @@ class NormalFloat(nn.Module):
         return updated_global_tensor
 
 
-def NF_update(model, global_model, args):
+def NF_update(model, global_model, wt_bit, args):
     
     g_params = dict(global_model.named_parameters())
         
     for name, param in model.named_parameters():
         if hasattr(args.quantizer, 'keyword'):
             if 'first-last' in args.quantizer.keyword and name == 'conv1.weight':
-                first_quant_conv = NormalFloat(n_bits=args.quantizer.wt_bitb)
+                first_quant_conv = NormalFloat(n_bits=wt_bit)
                 param.data.copy_(first_quant_conv(param.data, g_params[name].data)) 
             elif name != "conv1.weight" and ("conv1.weight" in name or "conv2.weight" in name):
-                layer_quant_conv = NormalFloat(n_bits=args.quantizer.wt_bit)
+                layer_quant_conv = NormalFloat(n_bits=wt_bit)
                 param.data.copy_(layer_quant_conv(param.data, g_params[name].data)) 
             elif "downsample.0.weight" in name:
-                quant_conv1x1 = NormalFloat(n_bits=args.quantizer.wt_bit)
+                quant_conv1x1 = NormalFloat(n_bits=wt_bit)
                 param.data.copy_(quant_conv1x1(param.data, g_params[name].data)) 
                 
                 
@@ -507,20 +507,20 @@ class E2M1(nn.Module):
         return updated_global_tensor
 
 
-def E2M1_update(model, global_model, args):
+def E2M1_update(model, global_model, wt_bit, args):
     
     g_params = dict(global_model.named_parameters())
         
     for name, param in model.named_parameters():
         if hasattr(args.quantizer, 'keyword'):
             if 'first-last' in args.quantizer.keyword and name == 'conv1.weight':
-                first_quant_conv = E2M1(n_bits=args.quantizer.wt_bitb, clip_prob=args.quantizer.wt_clip_prob)
+                first_quant_conv = E2M1(n_bits=wt_bit, clip_prob=args.quantizer.wt_clip_prob)
                 param.data.copy_(first_quant_conv(param.data, g_params[name].data)) 
             elif name != "conv1.weight" and ("conv1.weight" in name or "conv2.weight" in name):
-                layer_quant_conv = E2M1(n_bits=args.quantizer.wt_bit, clip_prob=args.quantizer.wt_clip_prob)
+                layer_quant_conv = E2M1(n_bits=wt_bit, clip_prob=args.quantizer.wt_clip_prob)
                 param.data.copy_(layer_quant_conv(param.data, g_params[name].data)) 
             elif "downsample.0.weight" in name:
-                quant_conv1x1 = E2M1(n_bits=args.quantizer.wt_bit, clip_prob=args.quantizer.wt_clip_prob)
+                quant_conv1x1 = E2M1(n_bits=wt_bit, clip_prob=args.quantizer.wt_clip_prob)
                 param.data.copy_(quant_conv1x1(param.data, g_params[name].data)) 
 
 
