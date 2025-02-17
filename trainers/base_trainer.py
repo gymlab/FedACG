@@ -107,7 +107,9 @@ class Trainer():
             for key in local_g.keys():
                 local_g[key] = torch.zeros_like(local_g[key]).to('cpu')
             self.past_local_deltas = {net_i: copy.deepcopy(local_g) for net_i in range(self.num_clients)}
-
+            
+        if self.args.quantizer.random_bit == 'fixed_alloc':
+            self.local_wt_bits = np.random.choice(np.array([1, 2, 4]), size=self.args.trainer.num_clients, replace=True)
 
     def local_update(self, device, task_queue, result_queue):
         if self.args.multiprocessing:
@@ -127,6 +129,11 @@ class Trainer():
                 idxs=self.local_dataset_split_ids[task['client_idx']],
                 subset_classes=self.args.dataset.get('subset_classes'),
                 )
+            
+            if self.args.quantizer.random_bit == 'fixed_alloc':
+                wt_bit = self.local_wt_bits[task['client_idx']]
+            elif self.args.quantizer.random_bit == 'rand_alloc':
+                wt_bit = np.random.choice(np.array([1, 2, 4]))
 
             setup_inputs = {
                 'state_dict': task['state_dict'],
@@ -134,6 +141,7 @@ class Trainer():
                 'local_dataset': local_dataset,
                 'local_lr': task['local_lr'],
                 'global_epoch': task['global_epoch'],
+                'wt_bit': wt_bit,
                 'trainer': self,
             }
 
@@ -212,6 +220,7 @@ class Trainer():
                     'local_lr': current_lr,
                     'global_epoch': epoch,
                 }
+                
                 if self.args.multiprocessing:
                     task_queues[i].put(task_queue_input)
                 else:
