@@ -3,7 +3,7 @@ BATCH_SIZE=50
 if [ ${DATASET} = "tinyimagenet" ];then
     BATCH_SIZE=100
 fi 
-ALPHA=0.6
+ALPHA=0.3
 DEVICE=0
 
 python3 federated_train.py client=base server=base visible_devices=\'$DEVICE\' exp_name=FedAvgViTWSQGTRand_"$ALPHA" \
