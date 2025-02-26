@@ -54,7 +54,6 @@ def load_and_normalize_data(file_paths):
         # std = np.std(clipped_data)
         std = np.std(layer_data)
         print(f"{file_path}: mean: {mean:.8f}, std: {std:.8f}, edge: {th / std:.4f}")
-        maxabs = np.max(np.abs(layer_data))
 
         # if std > 0:  # Avoid division by zero
         #     normalized_data = (layer_data - mean) / std
@@ -107,58 +106,54 @@ def plot_layer_histograms(normalized_data_dict, output_dir="normalized_histogram
     """
     os.makedirs(output_dir, exist_ok=True)
 
-    num_layers = len(normalized_data_dict)
-    fig, axes = plt.subplots(1, num_layers, figsize=(6 * num_layers, 6), sharey=True)
+    bin_edges = np.linspace(-5, 5, 100 + 1)
+    
+    plt.rcParams.update({'font.size': 16})
 
     for idx, (layer_name, data) in enumerate(normalized_data_dict.items()):
-        ax = axes[idx] if num_layers > 1 else axes
-
-        # Calculate statistics
-        layer_skewness = skew(data)  # Calculate skewness
-        layer_kurtosis = kurtosis(data)  # Calculate kurtosis
-        kl_divergence, wasserstein_dist = quantify_distribution_difference(data)  # Distribution differences
-
+        plt.figure(figsize=(7, 5))
         # Plot histogram
-        ax.hist(
-            data, bins=100, alpha=0.7, density=True, label=f"Skew: {layer_skewness:.2f}\nKurt: {layer_kurtosis:.2f}\nKL: {kl_divergence:.2f}\nW: {wasserstein_dist:.2f}", edgecolor='black'
-        )
-        
-        maxabs = np.max(np.abs(data))
-        
+        # ax.hist(
+        #     data, bins=100, alpha=0.7, density=True, label=f"Skew: {layer_skewness:.2f}\nKurt: {layer_kurtosis:.2f}\nKL: {kl_divergence:.2f}\nW: {wasserstein_dist:.2f}", edgecolor='black'
+        # )
+        # Compute histogram with fixed bins
+        hist_data, _ = np.histogram(data, bins=bin_edges, density=True)
+        # Plot histogram using precomputed bins
+        plt.bar(bin_edges[:-1], hist_data, width=np.diff(bin_edges), alpha=0.7, edgecolor='black')
+
         # NF4_VALUES = np.array([-1.0000, -0.6962, -0.5257, -0.3946, -0.2849, -0.1892, -0.0931, 0.0000,
         #                 0.0796, 0.1603, 0.2453, 0.3487, 0.4622, 0.5952, 0.7579, 1.0000])
         NF4_VALUES = np.array([-2.6436, -1.9735, -1.5080, -1.1490, -0.8337, -0.5439, -0.2686, 0.,
                                0.2303, 0.4648, 0.7081, 0.9663, 1.2481, 1.5676, 1.9676, 2.6488])
-        NF4_VALUES2 = np.array([-1.0000, -0.6962, -0.5257, -0.3946, -0.2849, -0.1892, -0.0931, 0.0000,
-                        0.0796, 0.1603, 0.2453, 0.3487, 0.4622, 0.5952, 0.7579, 1.0000]) * maxabs
+        # NF4_VALUES2 = np.array([-1.0000, -0.6962, -0.5257, -0.3946, -0.2849, -0.1892, -0.0931, 0.0000,
+        #                 0.0796, 0.1603, 0.2453, 0.3487, 0.4622, 0.5952, 0.7579, 1.0000]) * maxabs
         
         for nf in NF4_VALUES:
             # 클리핑 threshold 위치에 세로선 추가
-            ax.axvline(x=nf, color='green', linestyle='--', linewidth=1.5)
+            plt.axvline(x=nf, color='green', linestyle='--', linewidth=1.5)
             
-        for nf in NF4_VALUES2:
-            # 클리핑 threshold 위치에 세로선 추가
-            ax.axvline(x=nf, color='orange', linestyle='--', linewidth=1.5)
+        # for nf in NF4_VALUES2:
+        #     # 클리핑 threshold 위치에 세로선 추가
+        #     ax.axvline(x=nf, color='orange', linestyle='--', linewidth=1.5)
 
         # Plot standard normal distribution
-        x = np.linspace(-4, 4, 1000)
-        ax.plot(x, norm.pdf(x), label="Standard Normal", linestyle='--', color='red')
+        x = np.linspace(-5, 5, 1000)
+        plt.plot(x, norm.pdf(x), label="Standard normal", linestyle='--', color='red')
+        plt.xlim(-5, 5)  # X축 범위를 -4에서 4 사이로 제한
 
-        ax.set_title(layer_name)
-        ax.set_xlabel("Normalized Weight Difference")
-        if idx == 0:
-            ax.set_ylabel("Frequency")
-        ax.legend(loc='upper right')
-        ax.grid(True)
+        plt.xlabel("Normalized weight difference")
+        plt.ylabel("Frequency")
+        plt.legend(loc='upper right')
+        plt.grid(True)
 
-    plt.tight_layout()
+        plt.tight_layout()
 
-    # Save the combined histogram image
-    save_path = os.path.join(output_dir, f"layer_histograms_{alpha}.png")
-    plt.savefig(save_path)
-    plt.close()
+        # Save the combined histogram image
+        save_path = os.path.join(output_dir, f"{layer_name}_histogram_{alpha}.png")
+        plt.savefig(save_path)
+        plt.close()
 
-    print(f"Layer histograms saved to {save_path}")
+        print(f"Layer histograms saved to {save_path}")
 
 
 def process_multiple_files(file_paths, output_dir="normalized_histograms"):
