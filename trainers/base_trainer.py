@@ -108,7 +108,7 @@ class Trainer():
                 local_g[key] = torch.zeros_like(local_g[key]).to('cpu')
             self.past_local_deltas = {net_i: copy.deepcopy(local_g) for net_i in range(self.num_clients)}
             
-        if self.args.quantizer.random_bit == 'fixed_alloc':
+        if self.args.quantizer.name == "WSQG" and self.args.quantizer.random_bit == 'fixed_alloc':
             self.local_wt_bits = np.random.choice(np.array([1, 2, 4]), size=self.args.trainer.num_clients, replace=True)
 
     def local_update(self, device, task_queue, result_queue):
@@ -130,20 +130,30 @@ class Trainer():
                 subset_classes=self.args.dataset.get('subset_classes'),
                 )
             
-            if self.args.quantizer.random_bit == 'fixed_alloc':
-                wt_bit = self.local_wt_bits[task['client_idx']]
-            elif self.args.quantizer.random_bit == 'rand_alloc':
-                wt_bit = np.random.choice(np.array([1, 2, 4]))
+            if self.args.quantizer.name == 'WSQG':
+                if self.args.quantizer.random_bit == 'fixed_alloc':
+                    wt_bit = self.local_wt_bits[task['client_idx']]
+                elif self.args.quantizer.random_bit == 'rand_alloc':
+                    wt_bit = np.random.choice(np.array([1, 2, 4]))
 
-            setup_inputs = {
-                'state_dict': task['state_dict'],
-                'device': device,
-                'local_dataset': local_dataset,
-                'local_lr': task['local_lr'],
-                'global_epoch': task['global_epoch'],
-                'wt_bit': wt_bit,
-                'trainer': self,
-            }
+                setup_inputs = {
+                    'state_dict': task['state_dict'],
+                    'device': device,
+                    'local_dataset': local_dataset,
+                    'local_lr': task['local_lr'],
+                    'global_epoch': task['global_epoch'],
+                    'wt_bit': wt_bit,
+                    'trainer': self,
+                }
+            else:
+                setup_inputs = {
+                    'state_dict': task['state_dict'],
+                    'device': device,
+                    'local_dataset': local_dataset,
+                    'local_lr': task['local_lr'],
+                    'global_epoch': task['global_epoch'],
+                    'trainer': self,
+                }
 
             # update past_local_deltas, user idx
             if self.args.client.get('Dyn'):

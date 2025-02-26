@@ -17,6 +17,8 @@ class WSConv2d(nn.Conv2d):
         super(WSConv2d, self).__init__(in_channels, out_channels, kernel_size, stride,
                  padding, dilation, groups, bias)
         self.rho = rho
+        self.global_std = nn.Parameter(torch.tensor(1e-3, dtype=torch.float32))
+        self.local_std = nn.Parameter(torch.tensor(1e-3, dtype=torch.float32))
 
     def forward(self, x):
         weight = self.weight
@@ -30,6 +32,12 @@ class WSConv2d(nn.Conv2d):
         
     def set_rho(self, rho):
         self.rho = rho
+    
+    def set_std(self, std):
+        self.local_std.data = torch.full_like(self.local_std.data, std)
+        
+    def update_global_std(self, momentum=0.1):
+        self.global_std.data = self.global_std.data * (1. - momentum) + self.local_std.data * momentum
 
 
 class FireWS(nn.Module):
@@ -156,3 +164,9 @@ class SqueezeNet_WS(nn.Module):
             results['layer'+str(idx)]=out
 
         return results
+
+    def update_all_global_std(self, momentum=0.1):
+        """모델 내부의 모든 WSConv2d 레이어에서 update_global_std() 호출"""
+        for module in self.modules():  # self.modules()를 사용하면 모델의 모든 서브모듈을 가져옴
+            if isinstance(module, WSConv2d):  # WSConv2d인 경우
+                module.update_global_std(momentum)
