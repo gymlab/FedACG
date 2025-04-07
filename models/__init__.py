@@ -21,5 +21,6 @@ from models.quant import *
 from models.resnet_won import *
 from models.mobilevit import *
 from models.mobilevitWS import *
+from models.resnet18_WS_LPT import *
 
 from models.build import build_encoder

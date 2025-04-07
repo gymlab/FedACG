@@ -1,6 +1,7 @@
 from utils import get_numclasses
 from utils.registry import Registry
 import models
+from utils.quantizer import *
 
 ENCODER_REGISTRY = Registry("ENCODER")
 ENCODER_REGISTRY.__doc__ = """
@@ -31,6 +32,20 @@ def build_encoder(args):
 
     print(f"=> Creating model '{args.model.name}, pretrained={args.model.pretrained}'")
     
-    encoder = ENCODER_REGISTRY.get(args.model.name)(args, num_classes, **args.model) if len(args.model.name) > 0 else None
+    # Activation 양자화
+    quant_model = lambda: BlockQuantizer(args.quantizer.quantization_bits,args.quantizer.quantization_bits, args.quantizer.quant_type,
+                                             args.quantizer.small_block, args.quantizer.block_dim)
+    quant_function = quant_model()
+    
+    # if args.quantizer.get("quant", False):
+    #     args.model["quant"] = quant_function
+    # else:
+    #     args.model["quant"] = None
+    
+    
+    if args.quantizer.LPT_name == 'LPT':
+        encoder = ENCODER_REGISTRY.get(args.model.name)(args, num_classes, quant = quant_function, **args.model) if len(args.model.name) > 0 else None
+    else:
+        encoder = ENCODER_REGISTRY.get(args.model.name)(args, num_classes, **args.model) if len(args.model.name) > 0 else None
 
     return encoder

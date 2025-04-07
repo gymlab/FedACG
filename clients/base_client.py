@@ -22,6 +22,8 @@ from clients.build import CLIENT_REGISTRY
 
 from utils.qunat_function import AQD_update , PAQ_update, WSQ_update, HQ_update, NF_update, E2M1_update, WSQG_update, WSQLG_update
 
+from utils.quantizer import quantize_block
+
 
 @CLIENT_REGISTRY.register()
 class Client():
@@ -31,6 +33,7 @@ class Client():
         self.client_index = client_index
         self.model = model
         self.global_model =  copy.deepcopy(model)
+        
         for par in self.global_model.parameters():
             par.requires_grad = False
 
@@ -146,41 +149,105 @@ class Client():
         if global_epoch % 50 == 0:
             print(self.weights)
 
-        for local_epoch in range(self.args.trainer.local_epochs):
-            end = time.time()
-
-            for i, (images, labels) in enumerate(self.loader):
-                    
-                images, labels = images.to(self.device), labels.to(self.device)
-                self.model.zero_grad(set_to_none=True)
-
-                with autocast(enabled=self.args.use_amp):
-                    losses = self._algorithm(images, labels)
-                    # for loss_key in losses:
-                    #     if loss_key not in self.weights.keys():
-                    #         self.weights[loss_key] = 0
-                    loss = sum([self.weights[loss_key]*losses[loss_key] for loss_key in losses])
-
-                try:
-                    scaler.scale(loss).backward()
-                    scaler.unscale_(self.optimizer)
-                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), 10)
-                    scaler.step(self.optimizer)
-                    scaler.update()
-
-                except Exception as e:
-                    print(e)
-
-                loss_meter.update(loss.item(), images.size(0))
-                time_meter.update(time.time() - end)
+        if self.args.quantizer != 'LPT':
+        
+            for local_epoch in range(self.args.trainer.local_epochs):
                 end = time.time()
 
-            self.scheduler.step()
-        
-        logger.info(f"[C{self.client_index}] End. Time: {end-start:.4f}s, Loss: {loss_meter.avg:.3f}")
+                for i, (images, labels) in enumerate(self.loader):
+                        
+                    images, labels = images.to(self.device), labels.to(self.device)
+                    self.model.zero_grad(set_to_none=True)
 
-        self.model.to('cpu')
-        self.global_model.to('cpu')
+                    with autocast(enabled=self.args.use_amp):
+                        losses = self._algorithm(images, labels)
+                        # for loss_key in losses:
+                        #     if loss_key not in self.weights.keys():
+                        #         self.weights[loss_key] = 0
+                        loss = sum([self.weights[loss_key]*losses[loss_key] for loss_key in losses])
+
+                    try:
+                        scaler.scale(loss).backward()
+                        scaler.unscale_(self.optimizer)
+                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), 10)
+                        scaler.step(self.optimizer)
+                        scaler.update()
+
+                    except Exception as e:
+                        print(e)
+
+                    loss_meter.update(loss.item(), images.size(0))
+                    time_meter.update(time.time() - end)
+                    end = time.time()
+
+                self.scheduler.step()
+            
+            logger.info(f"[C{self.client_index}] End. Time: {end-start:.4f}s, Loss: {loss_meter.avg:.3f}")
+
+            self.model.to('cpu')
+            self.global_model.to('cpu')
+            
+        # LPT
+        else:
+            weight_quantizer = lambda x: quantize_block(
+            x, self.args.quantizer.quantization_bits, -1, self.args.quantizer_type, self.args.quantizer.small_block, self.args.quantizer.block_dim)
+            
+            grad_quantizer = lambda x: quantize_block(
+            x, self.args.quantizer.quantization_bits, -1, self.args.quantizer_type, self.args.quantizer.small_block, self.args.quantizer.block_dim)
+            
+            quantizer = {'weight_Q' : weight_quantizer , 'grad_Q' : grad_quantizer} 
+            
+            weight_Q = quantizer['weight_Q']
+            grad_Q = quantizer['grad_Q']
+        
+            for local_epoch in range(self.args.trainer.local_epochs):
+                end = time.time()
+
+                for i, (images, labels) in enumerate(self.loader):
+                        
+                    images, labels = images.to(self.device), labels.to(self.device)
+                    self.model.zero_grad(set_to_none=True)
+
+                    with autocast(enabled=self.args.use_amp):
+                        losses = self._algorithm(images, labels)
+                        # for loss_key in losses:
+                        #     if loss_key not in self.weights.keys():
+                        #         self.weights[loss_key] = 0
+                        loss = sum([self.weights[loss_key]*losses[loss_key] for loss_key in losses])
+
+                    try:
+                        scaler.scale(loss).backward()
+                        scaler.unscale_(self.optimizer)
+                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), 10)
+                        
+                        # Gradient 양자화
+                        with torch.no_grad():
+                            for name, param in self.model.named_parameters():
+                                # print(f"{name}: requires_grad={param.requires_grad}")
+                                if param.requires_grad:
+                                    param.grad.data = grad_Q(param.grad.data).data
+                        
+                        scaler.step(self.optimizer)
+                        scaler.update()
+                        
+                    except Exception as e:
+                        print(e)
+                    
+                    # 가중치 양자화
+                    with torch.no_grad():
+                        for name, p in self.model.named_parameters():
+                            p.data = weight_Q(p.data).data
+
+                    loss_meter.update(loss.item(), images.size(0))
+                    time_meter.update(time.time() - end)
+                    end = time.time()
+
+                self.scheduler.step()
+            
+            logger.info(f"[C{self.client_index}] End. Time: {end-start:.4f}s, Loss: {loss_meter.avg:.3f}")
+
+            self.model.to('cpu')
+            self.global_model.to('cpu')
 
         # # Temp
         # g = dict(self.global_model.named_parameters())
