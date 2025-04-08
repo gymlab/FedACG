@@ -1,5 +1,5 @@
 ## Model ##
-name: "ConvNet"
+name: "ConvNet_WS"
 pretrained: False
 l2_norm: False
 use_bn_layer: False
