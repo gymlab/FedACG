@@ -63,6 +63,7 @@ class Client():
                                                      lr_lambda=lambda epoch: self.args.trainer.local_lr_decay ** epoch)
     
         self.trainer = trainer
+        # if self.args.model.name != 'ConvNet':
         self.num_layers = self.model.num_layers
         self.class_counts = np.sort([*local_dataset.class_dict.values()])[::-1]
         if global_epoch == 0:
