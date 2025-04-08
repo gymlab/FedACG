@@ -221,7 +221,7 @@ class Client():
 
                             if param.requires_grad and param.grad is not None:
                                 param.grad.data = grad_Q(param.grad.data).data
-                                tmp = []
+
                     
                     self.optimizer.step()
 
@@ -229,7 +229,7 @@ class Client():
                     with torch.no_grad():
                         for name, p in self.model.named_parameters():
                             p.data = weight_Q(p.data).data
-                            tmp = []
+
 
                     loss_meter.update(loss.item(), images.size(0))
                     time_meter.update(time.time() - end)
