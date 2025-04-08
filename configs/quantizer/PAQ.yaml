@@ -1,4 +1,5 @@
 name: "PAQ"
+LPT_name: "none"
 uplink: True
 downlink: False
 wt_bit: 1

@@ -33,9 +33,10 @@ def build_encoder(args):
     print(f"=> Creating model '{args.model.name}, pretrained={args.model.pretrained}'")
     
     # Activation 양자화
-    quant_model = lambda: BlockQuantizer(args.quantizer.quantization_bits,args.quantizer.quantization_bits, args.quantizer.quant_type,
+    if args.quantizer.LPT_name == 'LPT':
+        quant_model = lambda: BlockQuantizer(args.quantizer.quantization_bits,args.quantizer.quantization_bits, args.quantizer.quant_type,
                                              args.quantizer.small_block, args.quantizer.block_dim)
-    quant_function = quant_model()
+        quant_function = quant_model()
     
     # if args.quantizer.get("quant", False):
     #     args.model["quant"] = quant_function

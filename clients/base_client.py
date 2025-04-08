@@ -149,7 +149,7 @@ class Client():
         if global_epoch % 50 == 0:
             print(self.weights)
 
-        if self.args.quantizer != 'LPT':
+        if self.args.quantizer.LPT_name != 'LPT':
         
             for local_epoch in range(self.args.trainer.local_epochs):
                 end = time.time()
@@ -190,10 +190,10 @@ class Client():
         # LPT
         else:
             weight_quantizer = lambda x: quantize_block(
-            x, self.args.quantizer.quantization_bits, -1, self.args.quantizer_type, self.args.quantizer.small_block, self.args.quantizer.block_dim)
+            x, self.args.quantizer.quantization_bits, -1, self.args.quantizer.quant_type, self.args.quantizer.small_block, self.args.quantizer.block_dim)
             
             grad_quantizer = lambda x: quantize_block(
-            x, self.args.quantizer.quantization_bits, -1, self.args.quantizer_type, self.args.quantizer.small_block, self.args.quantizer.block_dim)
+            x, self.args.quantizer.quantization_bits, -1, self.args.quantizer.quant_type, self.args.quantizer.small_block, self.args.quantizer.block_dim)
             
             quantizer = {'weight_Q' : weight_quantizer , 'grad_Q' : grad_quantizer} 
             
@@ -208,31 +208,21 @@ class Client():
                     images, labels = images.to(self.device), labels.to(self.device)
                     self.model.zero_grad(set_to_none=True)
 
-                    with autocast(enabled=self.args.use_amp):
-                        losses = self._algorithm(images, labels)
-                        # for loss_key in losses:
-                        #     if loss_key not in self.weights.keys():
-                        #         self.weights[loss_key] = 0
-                        loss = sum([self.weights[loss_key]*losses[loss_key] for loss_key in losses])
-
-                    try:
-                        scaler.scale(loss).backward()
-                        scaler.unscale_(self.optimizer)
-                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), 10)
-                        
-                        # Gradient 양자화
-                        with torch.no_grad():
-                            for name, param in self.model.named_parameters():
-                                # print(f"{name}: requires_grad={param.requires_grad}")
-                                if param.requires_grad:
-                                    param.grad.data = grad_Q(param.grad.data).data
-                        
-                        scaler.step(self.optimizer)
-                        scaler.update()
-                        
-                    except Exception as e:
-                        print(e)
+                    self.optimizer.zero_grad()
                     
+                    losses = self._algorithm(images, labels)
+                    loss = sum([self.weights[loss_key]*losses[loss_key] for loss_key in losses])
+                    loss.backward()
+
+                    # Gradient 양자화
+                    with torch.no_grad():
+                        for name, param in self.model.named_parameters():
+
+                            if param.requires_grad and param.grad is not None:
+                                param.grad.data = grad_Q(param.grad.data).data
+                    
+                    self.optimizer.step()
+
                     # 가중치 양자화
                     with torch.no_grad():
                         for name, p in self.model.named_parameters():

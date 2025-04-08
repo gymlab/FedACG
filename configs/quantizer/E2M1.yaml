@@ -1,4 +1,5 @@
 name: "E2M1"
+LPT_name: "none"
 uplink: True
 downlink: False
 

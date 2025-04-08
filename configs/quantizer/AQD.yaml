@@ -1,4 +1,5 @@
 name: "AQD"
+LPT_name: "none"
 uplink: True
 downlink: False
 
