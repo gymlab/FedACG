@@ -207,14 +207,13 @@ class Client():
                 for i, (images, labels) in enumerate(self.loader):
                         
                     images, labels = images.to(self.device), labels.to(self.device)
-                    self.model.zero_grad(set_to_none=True)
-
-                    self.optimizer.zero_grad()
-                    
+                    self.model.zero_grad(set_to_none=True)                    
                     losses = self._algorithm(images, labels)
                     loss = sum([self.weights[loss_key]*losses[loss_key] for loss_key in losses])
                     loss.backward()
 
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), 10)
+                    
                     # Gradient 양자화
                     with torch.no_grad():
                         for name, param in self.model.named_parameters():
