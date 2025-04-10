@@ -2,7 +2,7 @@ DATASET=cifar10
 MODEL=resnet18_WS_LPT
 ALPHA=0.1
 
-for NBITS in 4 6 8 2
+for NBITS in 5 6 8 4 2
 do
     if [ "${DATASET}" = "tinyimagenet" ]; then
         BATCH_SIZE=100
