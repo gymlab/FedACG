@@ -1,5 +1,5 @@
 ## Model ##
-name: "ResNet18_WS"
+name: "ResNet8_LPT"
 pretrained: False
 l2_norm: False
 use_bn_layer: False
@@ -7,3 +7,7 @@ use_bn_layer: False
 last_feature_dim: 512
 rho: 1e-3
 init_mode: "kaiming_uniform"
+
+moving_average: True
+mv_alpha: 0.9
+ma_start: 1

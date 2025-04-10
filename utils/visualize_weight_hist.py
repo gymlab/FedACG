@@ -49,6 +49,7 @@ def load_and_normalize_data(file_paths):
         layer_data = weight_diff_data.flatten()  # Flatten the entire layer data
         # mean = np.mean(layer_data)
         clipped_data, th = clip_by_prob(layer_data.copy(), 0.0001)
+        maxabs = np.max(np.abs(clipped_data))
         # layer_data = clipped_data
         mean = np.mean(layer_data)
         # std = np.std(clipped_data)
@@ -64,7 +65,7 @@ def load_and_normalize_data(file_paths):
 
         normalized_data_dict[layer_name] = normalized_data
 
-    return normalized_data_dict
+    return normalized_data_dict, maxabs/std
 
 def quantify_distribution_difference(data):
     """
@@ -96,7 +97,7 @@ def quantify_distribution_difference(data):
 
     return kl_divergence, wasserstein_dist
 
-def plot_layer_histograms(normalized_data_dict, output_dir="normalized_histograms"):
+def plot_layer_histograms(normalized_data_dict, output_dir="normalized_histograms", maxabs=1.):
     """
     Plots and saves histograms for each normalized layer in a single subplot figure.
 
@@ -106,12 +107,12 @@ def plot_layer_histograms(normalized_data_dict, output_dir="normalized_histogram
     """
     os.makedirs(output_dir, exist_ok=True)
 
-    bin_edges = np.linspace(-5, 5, 100 + 1)
+    bin_edges = np.linspace(-7, 7, 100 + 1)
     
     plt.rcParams.update({'font.size': 16})
 
     for idx, (layer_name, data) in enumerate(normalized_data_dict.items()):
-        plt.figure(figsize=(7, 5))
+        plt.figure(figsize=(12, 5))
         # Plot histogram
         # ax.hist(
         #     data, bins=100, alpha=0.7, density=True, label=f"Skew: {layer_skewness:.2f}\nKurt: {layer_kurtosis:.2f}\nKL: {kl_divergence:.2f}\nW: {wasserstein_dist:.2f}", edgecolor='black'
@@ -119,31 +120,43 @@ def plot_layer_histograms(normalized_data_dict, output_dir="normalized_histogram
         # Compute histogram with fixed bins
         hist_data, _ = np.histogram(data, bins=bin_edges, density=True)
         # Plot histogram using precomputed bins
-        plt.bar(bin_edges[:-1], hist_data, width=np.diff(bin_edges), alpha=0.7, edgecolor='black')
+        plt.bar(bin_edges[:-1], hist_data, width=np.diff(bin_edges), alpha=0.3)
 
-        # NF4_VALUES = np.array([-1.0000, -0.6962, -0.5257, -0.3946, -0.2849, -0.1892, -0.0931, 0.0000,
-        #                 0.0796, 0.1603, 0.2453, 0.3487, 0.4622, 0.5952, 0.7579, 1.0000])
-        NF4_VALUES = np.array([-2.6436, -1.9735, -1.5080, -1.1490, -0.8337, -0.5439, -0.2686, 0.,
-                               0.2303, 0.4648, 0.7081, 0.9663, 1.2481, 1.5676, 1.9676, 2.6488])
-        # NF4_VALUES2 = np.array([-1.0000, -0.6962, -0.5257, -0.3946, -0.2849, -0.1892, -0.0931, 0.0000,
-        #                 0.0796, 0.1603, 0.2453, 0.3487, 0.4622, 0.5952, 0.7579, 1.0000]) * maxabs
+        # B=4
+        NF4_VALUES = np.array([-2.6536, -1.9735, -1.508, -1.149, -0.8337, -0.5439, -0.2686, 0.,
+            0.2686, 0.5439, 0.8337, 1.149, 1.508, 1.9735, 2.6536])
+        NF4_VALUES2 = np.array([-1.0000, -0.6962, -0.5257, -0.3946, -0.2849, -0.1892, -0.0931, 0.0000,
+                        0.0796, 0.1603, 0.2453, 0.3487, 0.4622, 0.5952, 0.7579, 1.0000]) * maxabs
+        NF4_VALUES3 = np.array([-6., -4., -3., -2., -1.5, -1., -0.5, 0., 0.5, 1., 1.5, 2., 3., 4., 6.]) * maxabs / 6.
+        # # b=2
+        # NF4_VALUES = np.array([-1.224, 0, 0.7646, 1.7242])
+        # NF4_VALUES2 = np.array([-1., 0., 0.3339, 1.]) * maxabs
+        # NF4_VALUES3 = np.array([-1.5, 0., 1.5]) * maxabs / 1.5
+        # # b=1
         
-        for nf in NF4_VALUES:
-            # 클리핑 threshold 위치에 세로선 추가
-            plt.axvline(x=nf, color='green', linestyle='--', linewidth=1.5)
-            
-        # for nf in NF4_VALUES2:
-        #     # 클리핑 threshold 위치에 세로선 추가
-        #     ax.axvline(x=nf, color='orange', linestyle='--', linewidth=1.5)
+        # Add vertical lines and legends
+        
+
+        for i, nf in enumerate(NF4_VALUES2):
+            plt.axvline(x=nf, color='green', linewidth=1.5, label="NF" if i == 0 else "")
+
+        for i, nf in enumerate(NF4_VALUES3):
+            plt.axvline(x=nf, color='blue',  linewidth=1.5, label="FP" if i == 0 else "")
+
+        for i, nf in enumerate(NF4_VALUES):
+            plt.axvline(x=nf, color='orange', linewidth=1.5, label="DANUQ" if i == 0 else "")
+
 
         # Plot standard normal distribution
-        x = np.linspace(-5, 5, 1000)
+        x = np.linspace(-7, 7, 1000)
         plt.plot(x, norm.pdf(x), label="Standard normal", linestyle='--', color='red')
-        plt.xlim(-5, 5)  # X축 범위를 -4에서 4 사이로 제한
+        plt.xlim(-7, 7)  # X축 범위를 -4에서 4 사이로 제한
 
-        plt.xlabel("Normalized weight difference")
+        plt.xlabel("LMPUs")
         plt.ylabel("Frequency")
-        plt.legend(loc='upper right')
+        # Legend를 그래프 바깥에 배치
+        plt.legend(loc='upper left', bbox_to_anchor=(1.05, 1), fontsize=12)
+
         plt.grid(True)
 
         plt.tight_layout()
@@ -164,8 +177,8 @@ def process_multiple_files(file_paths, output_dir="normalized_histograms"):
         file_paths (list): List of paths to the .npy files.
         output_dir (str): Directory to save the generated combined histogram.
     """
-    normalized_data_dict = load_and_normalize_data(file_paths)
-    plot_layer_histograms(normalized_data_dict, output_dir=output_dir)
+    normalized_data_dict, maxabs = load_and_normalize_data(file_paths)
+    plot_layer_histograms(normalized_data_dict, output_dir=output_dir, maxabs=maxabs)
 
 if __name__ == '__main__':
     file_paths = [

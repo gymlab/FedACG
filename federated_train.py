@@ -29,7 +29,7 @@ def main(args : DictConfig) -> None:
     torch.multiprocessing.set_sharing_strategy('file_system')   # the way of shared files in multi-processing
     set_start_method('spawn', True)
     # pid = os.getpid()
-    os.environ["CUDA_VISIBLE_DEVICES"] = args.visible_devices
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(args.visible_devices)
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     print(f"Available GPUs: {torch.cuda.device_count()}")
 

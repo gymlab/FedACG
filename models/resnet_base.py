@@ -142,3 +142,12 @@ class ResNet34_base(ResNet_base):
                         #  use_pretrained=args.model.pretrained, use_bn_layer=args.model.use_bn_layer
                          )
      
+     
+@ENCODER_REGISTRY.register()
+class ResNet8_base(ResNet_base):
+
+    def __init__(self, args: DictConfig, num_classes: int = 10, **kwargs):
+        super().__init__(BasicBlock, [1, 1, 1, 1], num_classes=num_classes, **kwargs
+                        #  l2_norm=args.model.l2_norm,
+                        #  use_pretrained=args.model.pretrained, use_bn_layer=args.model.use_bn_layer
+                         )

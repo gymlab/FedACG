@@ -28,6 +28,12 @@ class Server():
         for param_key in local_weights:
             local_weights[param_key] = sum(local_weights[param_key])/C
         return local_weights
+   
+    def moving_average(self, old_state_dict, new_state_dict, mv_alpha):
+
+        for key in old_state_dict.keys():
+            old_state_dict[key] = mv_alpha * old_state_dict[key] + (1 - mv_alpha) * new_state_dict[key]
+        return old_state_dict
     
 @SERVER_REGISTRY.register()
 class AnalizeServer():

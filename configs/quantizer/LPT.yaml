@@ -1,0 +1,17 @@
+name: 'none'
+LPT_name: "LPT"
+uplink: False
+downlink: False
+
+# WSQ
+keyword: []
+wt_bit: 8
+wt_clip_prob: -1
+momentum: 0.1
+
+# LPT
+quant: True
+quant_type: 'stochastic'
+quantization_bits: 8
+small_block: 'FC'
+block_dim: 'BC'

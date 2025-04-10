@@ -170,6 +170,8 @@ class Trainer():
 
             if not self.args.multiprocessing:
                 break
+            
+
 
     def train(self) -> Dict:
 
@@ -271,6 +273,11 @@ class Trainer():
             updated_global_state_dict = self.server.aggregate(local_weights, local_deltas,
                                                             selected_client_ids, copy.deepcopy(global_state_dict), current_lr, 
                                                             epoch=epoch if self.args.server.get('AnalizeServer') else None)
+            
+            if getattr(self.args.model, 'moving_average', False):
+                if epoch >= self.args.model.ma_start:
+                    mv_alpha = getattr(self.args.model, 'mv_alpha', 0.9)
+                    updated_global_state_dict = self.server.moving_average(global_state_dict, updated_global_state_dict, mv_alpha)
 
             self.model.load_state_dict(updated_global_state_dict)
             

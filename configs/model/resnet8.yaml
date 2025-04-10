@@ -1,9 +1,8 @@
 ## Model ##
-name: "ResNet18_WS"
+name: "ResNet8_base"
 pretrained: False
 l2_norm: False
 use_bn_layer: False
 # freeze_layer: False  # or ['fc']
 last_feature_dim: 512
-rho: 1e-3
-init_mode: "kaiming_uniform"
+

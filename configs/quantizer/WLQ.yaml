@@ -1,4 +1,5 @@
 name: "WLQ"
+LPT_name: "none"
 uplink: True
 downlink: False
 
