@@ -37,6 +37,11 @@ def build_encoder(args):
         quant_model = lambda: BlockQuantizer(args.quantizer.quantization_bits,args.quantizer.quantization_bits, args.quantizer.quant_type,
                                              args.quantizer.small_block, args.quantizer.block_dim)
         quant_function = quant_model()
+        
+        server_model = lambda: BlockQuantizer(-1 , -1, args.quantizer.quant_type,
+                                             args.quantizer.small_block, args.quantizer.block_dim)
+        
+        server_quant_function = server_model()
     
     # if args.quantizer.get("quant", False):
     #     args.model["quant"] = quant_function
@@ -46,7 +51,9 @@ def build_encoder(args):
     
     if args.quantizer.LPT_name == 'LPT':
         encoder = ENCODER_REGISTRY.get(args.model.name)(args, num_classes, quant = quant_function, **args.model) if len(args.model.name) > 0 else None
+        eval_encoder= ENCODER_REGISTRY.get(args.model.name)(args, num_classes, quant = server_quant_function, **args.model) if len(args.model.name) > 0 else None
     else:
         encoder = ENCODER_REGISTRY.get(args.model.name)(args, num_classes, **args.model) if len(args.model.name) > 0 else None
-
-    return encoder
+        eval_encoder = ENCODER_REGISTRY.get(args.model.name)(args, num_classes, **args.model) if len(args.model.name) > 0 else None
+    
+    return encoder, eval_encoder

@@ -56,14 +56,14 @@ def main(args : DictConfig) -> None:
     print("device", device)
 
     # initialize moddules
-    model = build_encoder(args)
+    model, eval_model = build_encoder(args)
     client_type = get_client_type(args)
     server = build_server(args)
     datasets = build_datasets(args)
     evaler_type = get_evaler_type(args)
 
     trainer_type = get_trainer_type(args)
-    trainer = trainer_type(model=model, client_type=client_type, server=server, evaler_type=evaler_type,
+    trainer = trainer_type(model=model, eval_model = eval_model, client_type=client_type, server=server, evaler_type=evaler_type,
                            datasets=datasets,
                            device=device, args=args, config=None)
     trainer.train()

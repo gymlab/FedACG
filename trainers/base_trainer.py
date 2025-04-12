@@ -44,6 +44,7 @@ class Trainer():
 
     def __init__(self,
                  model: nn.Module,
+                 eval_model: nn.Module,
                  client_type: Type,
                  server: Server,
                  evaler_type: Type,
@@ -56,6 +57,7 @@ class Trainer():
         self.args = args
         self.device = device
         self.model = model
+        self.eval_model = eval_model
 
         self.checkpoint_path = Path(self.args.checkpoint_path)
         mode = self.args.split.mode 
@@ -274,12 +276,16 @@ class Trainer():
                                                             selected_client_ids, copy.deepcopy(global_state_dict), current_lr, 
                                                             epoch=epoch if self.args.server.get('AnalizeServer') else None)
             
+            #moving average
             if getattr(self.args.model, 'moving_average', False):
                 if epoch >= self.args.model.ma_start:
                     mv_alpha = getattr(self.args.model, 'mv_alpha', 0.9)
                     updated_global_state_dict = self.server.moving_average(global_state_dict, updated_global_state_dict, mv_alpha)
 
             self.model.load_state_dict(updated_global_state_dict)
+            
+            # 평가는 full precision
+            self.eval_model.load_state_dict(updated_global_state_dict)
             
             if self.args.quantizer.name == "WSQG":
                 self.model.update_all_global_std(self.args.quantizer.momentum)

@@ -335,6 +335,9 @@ class ResNet_WS_LPT(ResNet_WSConv_LPT):
             out0 = self.bn1(self.conv1(x))
             results['layer0'] = out0
             out0 = F.relu(out0)
+            
+            if self.quant is not None:
+                out0 = self.quant(out0)
 
             out = out0
             for i, sublayer in enumerate(self.layer1):
