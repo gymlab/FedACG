@@ -356,7 +356,7 @@ class Trainer():
 
     def evaluate(self, epoch: int) -> Dict:
 
-        results = self.evaler.eval(model=copy.deepcopy(self.model), epoch=epoch)
+        results = self.evaler.eval(model=copy.deepcopy(self.eval_model), epoch=epoch)
         acc = results["acc"]
 
         wandb_dict = {
