@@ -2,6 +2,12 @@ import torch
 import torch.nn as nn
 import math
 
+Q_VALUES_TABLE = {
+    2: torch.tensor([-0.7979, 0.7979]),                     
+    3: torch.tensor([-1.224, 0, 0.7646, 1.7242]	),       
+    4: torch.tensor([-2.6536, -1.9735, -1.508, -1.149, -0.8337, -0.5439, -0.2686, 0.,
+            0.2686, 0.5439, 0.8337, 1.149, 1.508, 1.9735, 2.6536]) 
+}
 
 class BlockRounding(torch.autograd.Function):
     @staticmethod
@@ -11,13 +17,13 @@ class BlockRounding(torch.autograd.Function):
         if forward_bits == -1: return x
         self.small_block = small_block
         self.block_dim = block_dim
-        return block_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
+        return quantize_block(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
 
     @staticmethod
     def backward(self, grad_output):
         if self.needs_input_grad[0]:
             if self.backward_bits != -1:
-                grad_input = block_quantize(grad_output, self.backward_bits, self.mode,
+                grad_input = quantize_block(grad_output, self.backward_bits, self.mode,
                                             small_block=self.small_block, block_dim=self.block_dim)
             else:
                 grad_input = grad_output
@@ -101,80 +107,65 @@ def block_quantize(data, bits, mode, ebit=8, small_block="FC", block_dim="B"):
 
     return temp
 
-# def block_quantize_danuq(data, bits, mode, small_block="FC", block_dim="B"):
+def bucket_quantize(x, q_values):
 
-#     with torch.no_grad():
-#         assert data.dim() <= 4
-#         device = data.device
-#         clip_prob = -1
-#         q_values = {
-#             1: torch.tensor([-0.7979, 0.7979], device=device),
-#             2: torch.tensor([-1.224, 0, 0.7646, 1.7242]	, device=device),
-#             # 3: torch.tensor([0.4510, 0.7481, 0.9882], device=device),
-#             4: torch.tensor([-2.7327, -2.0691, -1.6181, -1.2563, -0.9424, -0.6568, -0.3881, 0.1284,
-#             0.1284, 0.3881, 0.6568, 0.9424, 1.2563, 1.6181, 2.0691, 2.7327], device=device)
-#         }
+    x_mean = x.mean()
+    x_std = x.std()
 
-#         if bits not in q_values:
-#             raise ValueError(f"No predefined lookup table for {bits} bits.")
+    if x_std < 1e-12:
+        return torch.zeros_like(x) 
 
-#         q_values = q_values[bits]
-#         num_levels = q_values.numel()
+    x_normed = (x - x_mean) / x_std
 
-#         # data_h = data.clone().clamp(min=1e-10)
-#         # data_l = data.clone().clamp(max=-1e-10)
-#         # data = torch.where(data >= 0, data_h, data_l)
-        
-#         if clip_prob > 0:
-#             data_abs = torch.abs(data)
-#             k = int((1 - (clip_prob)) * data_abs.numel())
-#             clip_threshold = torch.kthvalue(data_abs.view(-1), k).values    
-#             data = torch.clamp(data, min=-clip_threshold, max=clip_threshold)
-        
-#         edges = 0.5 * (q_values[1:] + q_values[:-1])
-        
-#         if small_block == "Conv":
-#             dim_threshold = 2
-#         elif small_block == "FC":
-#             dim_threshold = 1
-#         elif small_block == "None":
-#             dim_threshold = 4
-#         else:
-#             raise ValueError("Invalid small block option {}".format(small_block))
 
-#         if data.dim() <= dim_threshold:
-#             mean = data.mean()
-#             std = data.std() + 1e-12
-#         else:
-#             if block_dim == "B":
-#                 flat = data.view(data.size(0), -1)
-#                 mean = flat.mean(dim=1).view(data.size(0), *[1] * (data.dim() - 1))
-#                 std = flat.std(dim=1).view(data.size(0), *[1] * (data.dim() - 1)) + 1e-12
-#             elif block_dim == "BC":
-#                 flat = data.view(data.size(0) * data.size(1), -1)
-#                 mean = flat.mean(dim=1).view(data.size(0), data.size(1), *[1] * (data.dim() - 2))
-#                 std = flat.std(dim=1).view(data.size(0), data.size(1), *[1] * (data.dim() - 2)) + 1e-12
-#             else:
-#                 raise ValueError("Invalid block dim option {}".format(block_dim))
+    q_values = torch.sort(q_values).values
+    q_values = q_values.to(x.device)
+    edges = 0.5 * (q_values[1:] + q_values[:-1])
+    edges = edges.to(x.device)
 
-#         # z = (data - mean) / std
-#         z = data / std
-#         indices = torch.bucketize(z, edges, right= False)
-        
-        
-#         # z_exp = z.unsqueeze(-1)
-#         # q_exp = q_values.view(*([1] * z.dim()), -1)
-#         # distances = torch.abs(z_exp - q_exp)
-#         # indices = torch.argmin(distances, dim=-1)
+    indices = torch.bucketize(x_normed, edges, right=False)
 
-#         # if mode == "stochastic":
-#         #     noise = torch.randint_like(indices, low=-1, high=2)
-#         #     indices = torch.clamp(indices + noise, 0, num_levels - 1)
+    quantized_normed = q_values[indices]
+    dequantized_x = quantized_normed * x_std + x_mean
 
-#         quantized_z = q_values[indices]
-#         dequantized = quantized_z * std
+    return dequantized_x
 
-#         return dequantized
+
+def DANUQ_quantize(x: torch.Tensor, bits, mode, ebit=8, small_block = "FC", block_dim = "B"):
+
+    if bits not in Q_VALUES_TABLE:
+        raise ValueError(f"Unsupported bits value: {bits}")
+
+    q_values = Q_VALUES_TABLE[bits]
+
+    if small_block == "Conv":
+        dim_threshold = 2
+    elif small_block == "FC":
+        dim_threshold = 1
+    elif small_block == "None":
+        dim_threshold = 4
+    else:
+        raise ValueError("Invalid small_block option: {}".format(small_block))
+
+    out = torch.zeros_like(x)
+
+    if x.dim() <= dim_threshold:
+        out = bucket_quantize(x, q_values)
+    else:
+        if block_dim == "B":
+            bsz = x.size(0)
+            for b in range(bsz):
+                out[b] = bucket_quantize(x[b], q_values)
+        elif block_dim == "BC":
+            bsz = x.size(0)
+            ch = x.size(1)
+            for b in range(bsz):
+                for c in range(ch):
+                    out[b, c] = bucket_quantize(x[b, c], q_values)
+        else:
+            raise ValueError("Invalid block_dim option: {}".format(block_dim))
+
+    return out
 
 def add_r_(data):
     r = torch.rand_like(data)
