@@ -8,7 +8,7 @@ Q_VALUES_TABLE = {
     4: torch.tensor([-2.6536, -1.9735, -1.508, -1.149, -0.8337, -0.5439, -0.2686, 0.,
             0.2686, 0.5439, 0.8337, 1.149, 1.508, 1.9735, 2.6536]),
     6: torch.tensor([-2.154, -1.863, -1.676, -1.534, -1.418, -1.318, -1.23, -1.15, -1.078, -1.01, -0.947, -0.887, -0.831, -0.776, -0.725, -0.674, -0.626, -0.579, -0.533, -0.489,
-    -0.445, -0.402, -0.36, -0.319, -0.278, -0.237, -0.197, -0.157, -0.118, -0.078, -0.039, 0.038, 0.076, 0.114, 0.153, 0.191, 0.23, 0.269, 0.309, 0.349, 0.389, 0.431, 0.473, 0.516,
+    -0.445, -0.402, -0.36, -0.319, -0.278, -0.237, -0.197, -0.157, -0.118, -0.078, -0.039, 0, 0.038, 0.076, 0.114, 0.153, 0.191, 0.23, 0.269, 0.309, 0.349, 0.389, 0.431, 0.473, 0.516,
     0.56, 0.605, 0.651, 0.699, 0.748, 0.799, 0.852, 0.908, 0.967, 1.03, 1.097, 1.169, 1.248, 1.335, 1.434, 1.55, 1.691, 1.876, 2.166])
 }
 class BlockRounding(torch.autograd.Function):
@@ -20,18 +20,30 @@ class BlockRounding(torch.autograd.Function):
         self.small_block = small_block
         self.block_dim = block_dim
         # return block_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
-        return DANUQ_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
+        
+        with torch.no_grad():
+            q = DANUQ_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
+        #     q = block_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
+            
+        return x + (q - x).detach()
+    
     @staticmethod
     def backward(self, grad_output):
         if self.needs_input_grad[0]:
             if self.backward_bits != -1:
                 # grad_input = block_quantize(grad_output, self.backward_bits, self.mode,
                                             # small_block=self.small_block, block_dim=self.block_dim)
-                grad_input = DANUQ_quantize(grad_output, self.backward_bits, self.mode,
+                with torch.no_grad():
+                    gq = DANUQ_quantize(grad_output, self.backward_bits, self.mode,
                                             small_block=self.small_block, block_dim=self.block_dim)
+                    # gq = block_quantize(grad_output, self.backward_bits, self.mode,
+                                            # small_block=self.small_block, block_dim=self.block_dim)
+                grad_input = grad_output + (gq - grad_output).detach()
+                
             else:
                 grad_input = grad_output
         return grad_input, None, None, None, None, None, None
+    
 class BlockQuantizer(nn.Module):
     def __init__(self, wl_activate, wl_error, mode,
             small_block="None", block_dim="B"):
@@ -114,6 +126,7 @@ def DANUQ_quantize(x: torch.Tensor,
     q_values_sorted, _ = torch.sort(q_values)
     edges = 0.5 * (q_values_sorted[1:] + q_values_sorted[:-1])
     edges = edges.to(x.device)
+    
     if small_block == "Conv":
         dim_threshold = 2
     elif small_block == "FC":
@@ -125,10 +138,14 @@ def DANUQ_quantize(x: torch.Tensor,
     
     def bucket_quantize_blockwise(inp) -> torch.Tensor:
         x_mean = inp.mean()
-        x_std = torch.clamp(inp.std(unbiased = False), min = 1e-12)
+        x_std = inp.std(unbiased = False)
         
-        if x_std < 1e-12:
-            return torch.zeros_like(inp)
+        # if x_std.min() <= 1e-5:
+        #     print(x_std.min(), inp.shape)
+        
+        # x_std = torch.clamp(x_std, min= 1e-5)
+        if x_std == 0:
+            return inp
         
         x_normed = (inp - x_mean) / x_std
         indices = torch.bucketize(x_normed, edges, right=False)
@@ -144,23 +161,35 @@ def DANUQ_quantize(x: torch.Tensor,
             x_2d = x.view(B, -1)
             row_mean = x_2d.mean(dim=1, keepdim=True)
             row_std = x_2d.std(dim=1, keepdim=True, unbiased = False)
-            row_std = torch.clamp(row_std, min=1e-10)
-            x_normed = (x_2d - row_mean) / row_std
+            zero     = row_std == 0
+            row_std_safe = torch.where(zero, torch.ones_like(row_std), row_std)
+            x_normed = torch.where(zero, torch.zeros_like(x_2d), (x_2d - row_mean)/row_std_safe)
+            # if row_std.min() <= 1e-5:
+            #     print(row_std.min(), x.shape)
+                
+            # row_std = torch.clamp(row_std, min=1e-5)
+            # x_normed = (x_2d - row_mean) / row_std
             indices = torch.bucketize(x_normed, edges, right=False)
             quant_normed = q_values_sorted[indices]
-            x_deq_2d = quant_normed * row_std + row_mean
+            x_deq_2d = quant_normed * row_std_safe + row_mean
             return x_deq_2d.view_as(x)
+        
         elif block_dim == "BC":
             B, C = x.size(0), x.size(1)
             x_2d = x.view(B*C, -1)
             row_mean = x_2d.mean(dim=1, keepdim=True)
             row_std = x_2d.std(dim=1, keepdim=True, unbiased = False)
-            row_std = torch.clamp(row_std, min=1e-10)
-            x_normed = (x_2d - row_mean) / row_std
+            # print(min(row_std), x.shape)
+            zero     = row_std == 0
+            row_std_safe = torch.where(zero, torch.ones_like(row_std), row_std)
+            # row_std = torch.clamp(row_std, min=1e-10)
+            x_normed = torch.where(zero, torch.zeros_like(x_2d), (x_2d - row_mean)/row_std_safe)
+            # x_normed = (x_2d - row_mean) / row_std
             indices = torch.bucketize(x_normed, edges, right=False)
             quant_normed = q_values_sorted[indices]
-            x_deq_2d = quant_normed * row_std + row_mean
+            x_deq_2d = quant_normed * row_std_safe + row_mean
             return x_deq_2d.view_as(x)
+        
         else:
             raise ValueError("Invalid block_dim option: {}".format(block_dim))
 def add_r_(data):
