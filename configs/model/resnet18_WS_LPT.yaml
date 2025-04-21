@@ -6,8 +6,8 @@ use_bn_layer: False
 # freeze_layer: False  # or ['fc']
 last_feature_dim: 512
 rho: 1e-3
-init_mode: "kaiming_uniform"
+init_mode: "kaiming_normal"
 
-moving_average: True
+moving_average: False
 mv_alpha: 0.9
 ma_start: 1

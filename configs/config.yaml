@@ -31,7 +31,7 @@ log_dir: './checkpoints'
 
 #################### Data Split ####################
 split:
-  mode: 'dirichlet'
+  mode: 'iid'
   alpha: 0.3
   class_per_client: 0 # only for skew mode
   unbalanced: False

@@ -1,6 +1,36 @@
 import torch
 import torch.nn as nn
 import math
+from typing import Literal
+
+import matplotlib.pyplot as plt
+import torch
+import numpy as np
+from scipy.stats import shapiro, skew, kurtosis, norm, entropy, wasserstein_distance
+
+
+def plot_input_distribution(inp: torch.Tensor, title='Input Distribution'):
+    inp_flat = inp.detach().cpu().numpy().flatten()
+    plt.figure(figsize=(6, 4))
+    plt.hist(inp_flat, bins=100, color='skyblue', edgecolor='black')
+    plt.title(title)
+    plt.xlabel('Value')
+    plt.ylabel('Frequency')
+    plt.grid(True)
+    plt.show()
+    
+def plot_tensor_distribution(x, title='Weight Distribution'):
+    import matplotlib.pyplot as plt
+
+    x_flat = x.detach().cpu().numpy().flatten()
+    plt.figure(figsize=(6, 4))
+    plt.hist(x_flat, bins=100, color='skyblue', edgecolor='black')
+    plt.title(title)
+    plt.xlabel('Value')
+    plt.ylabel('Frequency')
+    plt.grid(True)
+    plt.show()
+
 
 Q_VALUES_TABLE = {
     # 2: torch.tensor([-0.7979, 0.7979]),
@@ -26,12 +56,14 @@ class BlockRounding(torch.autograd.Function):
         self.small_block = small_block
         self.block_dim = block_dim
         # return block_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
-        
-        with torch.no_grad():
-            q = DANUQ_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
+        return DANUQ_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
+        # return StochNormQuant_parallel(x, forward_bits, small_block=self.small_block, block_dim=self.block_dim)
+    
+        # with torch.no_grad():
+            # q = DANUQ_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
         #     q = block_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
             
-        return x + (q - x).detach()
+        # return x + (q - x).detach()
     
     @staticmethod
     def backward(self, grad_output):
@@ -39,12 +71,17 @@ class BlockRounding(torch.autograd.Function):
             if self.backward_bits != -1:
                 # grad_input = block_quantize(grad_output, self.backward_bits, self.mode,
                                             # small_block=self.small_block, block_dim=self.block_dim)
-                with torch.no_grad():
-                    gq = DANUQ_quantize(grad_output, self.backward_bits, self.mode,
+                                            
+                grad_input = DANUQ_quantize(grad_output, self.backward_bits, self.mode,
                                             small_block=self.small_block, block_dim=self.block_dim)
+                                            
+                # grad_input = StochNormQuant_parallel(grad_output, self.backward_bits, small_block=self.small_block, block_dim=self.block_dim)
+                # with torch.no_grad():
+                #     gq = DANUQ_quantize(grad_output, self.backward_bits, self.mode,
+                #                             small_block=self.small_block, block_dim=self.block_dim)
                     # gq = block_quantize(grad_output, self.backward_bits, self.mode,
                                             # small_block=self.small_block, block_dim=self.block_dim)
-                grad_input = grad_output + (gq - grad_output).detach()
+                # grad_input = grad_output + (gq - grad_output).detach()
                 
             else:
                 grad_input = grad_output
@@ -90,12 +127,13 @@ def block_quantize(data, bits, mode, ebit=8, small_block="FC", block_dim="B"):
             print(f'there is nan in data: {torch.isnan(data).any()}')
             raise
     else:
-        if block_dim == "B":
+        if block_dim == "B":    # Better
             max_entry = torch.max(torch.abs(data.view(data.size(0), -1)), 1)[0]
             max_exponent = torch.floor(torch.log2(max_entry))
             max_exponent = torch.clamp(max_exponent, -2 ** (ebit - 1), 2 ** (ebit - 1) - 1)
             max_exponent = max_exponent.view([data.size(0)] + [1 for _ in range(data.dim() - 1)])
-        elif block_dim == "BC":
+            
+        elif block_dim == "BC":     # (8+4*9)/72
             max_entry = torch.max(torch.abs(data.view(data.size(0) * data.size(1), -1)), 1)[0]
             max_exponent = torch.floor(torch.log2(max_entry))
             max_exponent = torch.clamp(max_exponent, -2 ** (ebit - 1), 2 ** (ebit - 1) - 1)
@@ -143,20 +181,19 @@ def DANUQ_quantize(x: torch.Tensor,
         raise ValueError(f"Invalid small_block option: {small_block}")
     
     def bucket_quantize_blockwise(inp) -> torch.Tensor:
+        # plot_input_distribution(inp, title='Before Quantization')
         x_mean = inp.mean()
-        x_std = inp.std(unbiased = False)
+        x_std = inp.std(unbiased = True) + 1e-6  # row_std = row_std + 1e-6
         
-        # if x_std.min() <= 1e-5:
-        #     print(x_std.min(), inp.shape)
-        
-        # x_std = torch.clamp(x_std, min= 1e-5)
         if x_std == 0:
             return inp
         
         x_normed = (inp - x_mean) / x_std
         indices = torch.bucketize(x_normed, edges, right=False)
         quantized_normed = q_values_sorted[indices]
+        
         return quantized_normed * x_std + x_mean
+
     
     if x.dim() <= dim_threshold:
         return bucket_quantize_blockwise(x)
@@ -166,25 +203,20 @@ def DANUQ_quantize(x: torch.Tensor,
             B = x.size(0)
             x_2d = x.view(B, -1)
             row_mean = x_2d.mean(dim=1, keepdim=True)
-            row_std = x_2d.std(dim=1, keepdim=True, unbiased = False)
-            zero     = row_std == 0
-            row_std_safe = torch.where(zero, torch.ones_like(row_std), row_std)
-            x_normed = torch.where(zero, torch.zeros_like(x_2d), (x_2d - row_mean)/row_std_safe)
-            # if row_std.min() <= 1e-5:
-            #     print(row_std.min(), x.shape)
-                
-            # row_std = torch.clamp(row_std, min=1e-5)
-            # x_normed = (x_2d - row_mean) / row_std
+            row_std = x_2d.std(dim=1, keepdim=True, unbiased = True) + 1e-6   # unbiased = True, row_std = row_std + 1e-6
+            x_normed = (x_2d - row_mean) / row_std
             indices = torch.bucketize(x_normed, edges, right=False)
             quant_normed = q_values_sorted[indices]
             x_deq_2d = quant_normed * row_std_safe + row_mean
             return x_deq_2d.view_as(x)
         
         elif block_dim == "BC":
+            # plot_tensor_distribution(x, title='Conv Weight Distribution')
+            # analyze_normality(x)
             B, C = x.size(0), x.size(1)
             x_2d = x.view(B*C, -1)
             row_mean = x_2d.mean(dim=1, keepdim=True)
-            row_std = x_2d.std(dim=1, keepdim=True, unbiased = False)
+            row_std = x_2d.std(dim=1, keepdim=True, unbiased = False)   # unbiased = True
             # print(min(row_std), x.shape)
             zero     = row_std == 0
             row_std_safe = torch.where(zero, torch.ones_like(row_std), row_std)
@@ -194,11 +226,66 @@ def DANUQ_quantize(x: torch.Tensor,
             indices = torch.bucketize(x_normed, edges, right=False)
             quant_normed = q_values_sorted[indices]
             x_deq_2d = quant_normed * row_std_safe + row_mean
+            # plot_tensor_distribution(x_deq_2d, title='Conv Weight Distribution (64x64x3x3)')
             return x_deq_2d.view_as(x)
         
         else:
             raise ValueError("Invalid block_dim option: {}".format(block_dim))
+        
+
+def StochNormQuant_parallel(x: torch.Tensor,
+                            bits: int,
+                            small_block: str = "FC",
+                            block_dim: str = "B") -> torch.Tensor:
+    levels = 2 ** (bits - 1)       
+    eps = 1e-12
+
+    if small_block == "Conv":
+        dim_threshold = 2
+    elif small_block == "FC":
+        dim_threshold = 1
+    elif small_block == "None":
+        dim_threshold = 4
+    else:
+        raise ValueError
+
+    if x.dim() <= dim_threshold:      
+        flat = x.view(1, -1)
+        reshape_fn = lambda t: t.view_as(x)
+    else:
+        if block_dim == "B":
+            B = x.size(0)
+            flat = x.view(B, -1)                
+            reshape_fn = lambda t: t.view_as(x)
+        elif block_dim == "BC":
+            B, C = x.size(0), x.size(1)
+            flat = x.view(B * C, -1)            
+            reshape_fn = lambda t: t.view_as(x)
+        else:
+            raise ValueError(f"invalid block_dim: {block_dim}")
+
+
+    norm = torch.linalg.norm(flat, dim=1, keepdim=True)         
+    zero_mask = norm < eps
+    safe_norm = torch.where(zero_mask, torch.ones_like(norm), norm)
+
+    abs_ratio = (flat.abs() / safe_norm).clamp_(0, 1)           
+    scaled = abs_ratio * levels
+    lower = torch.floor(scaled)
+    upper = torch.clamp(lower + 1, max=levels)
+    p_upper = (scaled - lower)
+    rand_u = torch.rand_like(p_upper)
+    sel = torch.where(rand_u < p_upper, upper, lower)         
+    sel_level = sel / levels
+
+    quant = safe_norm * flat.sign() * sel_level                
+    quant[zero_mask.expand_as(quant)] = 0.                        
+
+    return reshape_fn(quant)
+
+
 def add_r_(data):
     r = torch.rand_like(data)
     data.add_(r)
+    
 quantize_block = BlockRounding.apply

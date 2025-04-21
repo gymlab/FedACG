@@ -195,6 +195,8 @@ class Trainer():
                 
         for epoch in range(self.start_round, self.global_rounds):
             
+            if epoch == 71:
+                print("71")
             self.lr_update(epoch=epoch)
             current_lr = self.lr
 

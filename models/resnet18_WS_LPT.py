@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class WSConv2d(nn.Conv2d):
 
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, dilation=1, groups=1, bias=True, rho=1e-3, init_mode="kaiming_uniform"):
+                 padding=0, dilation=1, groups=1, bias=True, rho=1e-3, init_mode="kaiming_normal"):
         super(WSConv2d, self).__init__(in_channels, out_channels, kernel_size, stride,
                  padding, dilation, groups, bias)
         self.rho = rho
@@ -61,7 +61,7 @@ class WSConv2d(nn.Conv2d):
 class BasicBlockWS_LPT(nn.Module):
     expansion = 1
 
-    def __init__(self, in_planes, planes, stride=1, use_bn_layer=False, rho=1e-3, init_mode="kaiming_uniform", quant = None):
+    def __init__(self, in_planes, planes, stride=1, use_bn_layer=False, rho=1e-3, init_mode="kaiming_normal", quant = None):
         super(BasicBlockWS_LPT, self).__init__()
         self.quant = quant
         
@@ -98,9 +98,19 @@ class BasicBlockWS_LPT(nn.Module):
         return out, out_i
 
     def forward(self, x: torch.Tensor, no_relu: bool = False) -> torch.Tensor:
-        out = F.relu(self.bn1(self.conv1(x)))
+        
+        out = self.bn1(self.conv1(x))
+        
         if self.quant is not None:
             out = self.quant(out)
+        
+        out = F.relu(out)
+        
+        
+        # out = F.relu(self.bn1(self.conv1(x)))
+        
+        # if self.quant is not None:
+            # out = self.quant(out)
             
         out = self.bn2(self.conv2(out))
         
@@ -130,7 +140,7 @@ class BasicBlockWS_LPT(nn.Module):
 class BottleneckWS_LPT(nn.Module):
     expansion = 4
     
-    def __init__(self, in_planes, planes, stride=1, use_bn_layer=False, rho=1e-3, init_mode="kaiming_uniform", quant = None):
+    def __init__(self, in_planes, planes, stride=1, use_bn_layer=False, rho=1e-3, init_mode="kaiming_normal", quant = None):
         super(BottleneckWS_LPT, self).__init__()
         
         self.quant = quant
@@ -190,7 +200,7 @@ class BottleneckWS_LPT(nn.Module):
 
 class ResNet_WSConv_LPT(nn.Module):
     def __init__(self, block, num_blocks, num_classes=10, l2_norm=False, use_pretrained=False, use_bn_layer=False,
-                 last_feature_dim=512, rho=1e-3, init_mode="kaiming_uniform", quant = None, **kwargs):
+                 last_feature_dim=512, rho=1e-3, init_mode="kaiming_normal", quant = None, **kwargs):
         
         #use_pretrained means whether to use torch torchvision.models pretrained model, and use conv1 kernel size as 7
         
@@ -245,7 +255,7 @@ class ResNet_WSConv_LPT(nn.Module):
     def get_linear(self):
         return nn.Linear
 
-    def _make_layer(self, block, planes, num_blocks, stride, use_bn_layer=False, rho=1e-3, init_mode="kaiming_uniform", quant = None):
+    def _make_layer(self, block, planes, num_blocks, stride, use_bn_layer=False, rho=1e-3, init_mode="kaiming_normal", quant = None):
         strides = [stride] + [1]*(num_blocks-1)
         layers = []
         for stride in strides:
@@ -334,10 +344,11 @@ class ResNet_WS_LPT(ResNet_WSConv_LPT):
         if no_relu:
             out0 = self.bn1(self.conv1(x))
             results['layer0'] = out0
-            out0 = F.relu(out0)
             
             if self.quant is not None:
                 out0 = self.quant(out0)
+                
+            out0 = F.relu(out0)
 
             out = out0
             for i, sublayer in enumerate(self.layer1):
