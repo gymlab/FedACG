@@ -2,10 +2,13 @@ import torch
 import torch.nn as nn
 import math
 from typing import Literal
-
+import os
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import torch
 import numpy as np
+import time
 from scipy.stats import shapiro, skew, kurtosis, norm, entropy, wasserstein_distance
 
 
@@ -30,6 +33,25 @@ def plot_tensor_distribution(x, title='Weight Distribution'):
     plt.ylabel('Frequency')
     plt.grid(True)
     plt.show()
+    
+def save_grad_output_distribution(grad_output, step=None, save_dir='grad_output_logs'):
+    os.makedirs(save_dir, exist_ok=True)
+
+    grad_np = grad_output.detach().cpu().numpy()
+
+    timestamp = time.time()
+    prefix = f'step_{step}' if step is not None else f'time_{timestamp:.6f}'
+
+    np.save(os.path.join(save_dir, f'{prefix}_values.npy'), grad_np)
+
+    plt.figure()
+    plt.hist(grad_np.flatten(), bins=100)
+    plt.title('Gradient Output Distribution')
+    plt.xlabel('Value')
+    plt.ylabel('Frequency')
+    plt.grid(True)
+    plt.savefig(os.path.join(save_dir, f'{prefix}_hist.png'))
+    plt.close()
 
 
 Q_VALUES_TABLE = {
@@ -49,14 +71,20 @@ Q_VALUES_TABLE = {
 }
 class BlockRounding(torch.autograd.Function):
     @staticmethod
-    def forward(self, x, forward_bits, backward_bits, mode, small_block="None", block_dim="B"):
+    def forward(self, x, forward_bits, backward_bits, mode, small_block="None", block_dim="B", quant_flag = "DANUQ"):
         self.backward_bits = backward_bits
         self.mode = mode
         if forward_bits == -1: return x
         self.small_block = small_block
         self.block_dim = block_dim
+        self.quant_flag = quant_flag
         # return block_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
-        return DANUQ_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
+        
+        if self.quant_flag == "DANUQ":
+            return DANUQ_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
+        elif self.quant_flag == "BFP":
+            return block_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
+        
         # return StochNormQuant_parallel(x, forward_bits, small_block=self.small_block, block_dim=self.block_dim)
     
         # with torch.no_grad():
@@ -69,11 +97,12 @@ class BlockRounding(torch.autograd.Function):
     def backward(self, grad_output):
         if self.needs_input_grad[0]:
             if self.backward_bits != -1:
-                # grad_input = block_quantize(grad_output, self.backward_bits, self.mode,
-                                            # small_block=self.small_block, block_dim=self.block_dim)
-                                            
-                grad_input = DANUQ_quantize(grad_output, self.backward_bits, self.mode,
+                grad_input = block_quantize(grad_output, self.backward_bits, self.mode,
                                             small_block=self.small_block, block_dim=self.block_dim)
+                
+                # save_grad_output_distribution(grad_output)
+                # grad_input = DANUQ_quantize(grad_output, self.backward_bits, self.mode,
+                #                             small_block=self.small_block, block_dim=self.block_dim)
                                             
                 # grad_input = StochNormQuant_parallel(grad_output, self.backward_bits, small_block=self.small_block, block_dim=self.block_dim)
                 # with torch.no_grad():
@@ -89,17 +118,18 @@ class BlockRounding(torch.autograd.Function):
     
 class BlockQuantizer(nn.Module):
     def __init__(self, wl_activate, wl_error, mode,
-            small_block="None", block_dim="B"):
+            small_block="None", block_dim="B", quant_flag = "DANUQ"):
         super(BlockQuantizer, self).__init__()
         self.wl_activate = wl_activate
         self.wl_error = wl_error
         self.mode = mode
         self.small_block="None"
         self.block_dim="B"
+        self.quant_flag= quant_flag
     def forward(self, x):
         return quantize_block(x, self.wl_activate,
                               self.wl_error, self.mode,
-                              self.small_block, self.block_dim)
+                              self.small_block, self.block_dim, self.quant_flag)
         
 def block_quantize(data, bits, mode, ebit=8, small_block="FC", block_dim="B"):
     with torch.no_grad():
@@ -207,7 +237,7 @@ def DANUQ_quantize(x: torch.Tensor,
             x_normed = (x_2d - row_mean) / row_std
             indices = torch.bucketize(x_normed, edges, right=False)
             quant_normed = q_values_sorted[indices]
-            x_deq_2d = quant_normed * row_std_safe + row_mean
+            x_deq_2d = quant_normed * row_std + row_mean
             return x_deq_2d.view_as(x)
         
         elif block_dim == "BC":
