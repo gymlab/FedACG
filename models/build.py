@@ -2,7 +2,7 @@ from utils import get_numclasses
 from utils.registry import Registry
 import models
 from utils.quantizer import *
-
+#
 ENCODER_REGISTRY = Registry("ENCODER")
 ENCODER_REGISTRY.__doc__ = """
 Registry for encoder
