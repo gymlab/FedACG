@@ -14,4 +14,5 @@ quant: True
 quant_type: 'stochastic'
 quantization_bits: 8
 small_block: 'FC'
-block_dim: 'BC'
+block_dim: 'B'
+uniform_mode: 'BFP'

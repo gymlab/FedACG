@@ -14,6 +14,7 @@ from typing import Callable, Dict, Tuple, Union, List
 from utils.logging_utils import AverageMeter
 from torch.cuda.amp import autocast, GradScaler
 from torch.utils.data import DataLoader
+import matplotlib.pyplot as plt
 
 import logging
 logger = logging.getLogger(__name__)
@@ -191,10 +192,10 @@ class Client():
         # LPT
         else:
             weight_quantizer = lambda x: quantize_block(
-            x, self.args.quantizer.quantization_bits, -1, self.args.quantizer.quant_type, self.args.quantizer.small_block, self.args.quantizer.block_dim)
+            x, self.args.quantizer.quantization_bits, -1, self.args.quantizer.quant_type, self.args.quantizer.small_block, self.args.quantizer.block_dim, self.args.quantizer.uniform_mode)
             
             grad_quantizer = lambda x: quantize_block(
-            x, self.args.quantizer.quantization_bits, -1, self.args.quantizer.quant_type, self.args.quantizer.small_block, self.args.quantizer.block_dim)
+            x, self.args.quantizer.quantization_bits, -1, self.args.quantizer.quant_type, self.args.quantizer.small_block, self.args.quantizer.block_dim, self.args.quantizer.uniform_mode)
             
             quantizer = {'weight_Q' : weight_quantizer , 'grad_Q' : grad_quantizer} 
             
@@ -205,7 +206,7 @@ class Client():
                 end = time.time()
 
                 for i, (images, labels) in enumerate(self.loader):
-                        
+                    
                     images, labels = images.to(self.device), labels.to(self.device)
                     self.model.zero_grad(set_to_none=True)                    
                     losses = self._algorithm(images, labels)
