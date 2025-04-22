@@ -35,7 +35,7 @@ def build_encoder(args):
     # Activation 양자화
     if args.quantizer.LPT_name == 'LPT':
         quant_model = lambda: BlockQuantizer(args.quantizer.quantization_bits, args.quantizer.quantization_bits, args.quantizer.quant_type,
-                                             args.quantizer.small_block, args.quantizer.block_dim)
+                                             args.quantizer.small_block, args.quantizer.block_dim, "BFP")
         
         quant_model2 = lambda: BlockQuantizer(args.quantizer.quantization_bits, args.quantizer.quantization_bits, args.quantizer.quant_type,
                                              args.quantizer.small_block, args.quantizer.block_dim, "BFP")

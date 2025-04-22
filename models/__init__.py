@@ -25,5 +25,6 @@ from models.resnet18_WS_LPT import *
 from models.resnet18_LPT import *
 from models.ConvNet import *
 from models.ConvNet_WS import *
+from models.resnet18_WS_LPT2 import *
 
 from models.build import build_encoder
