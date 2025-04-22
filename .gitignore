@@ -17,5 +17,5 @@ tmp
 3d_plots
 3d_plots/
 grad_output_distribution
-grad_output_logs
-./weight_figure
+grad_output_logs/
+./weight_figure/*
