@@ -144,13 +144,13 @@ class BasicBlockWS_LPT(nn.Module):
         dx = self.downsample(x)
         # plot_tensor_distribution(dx)
         if len(self.downsample) == 0:
-            out += dx
+            out = out + dx
                 
         else:
             if self.quant is not None:
                 out = out + self.quant(dx) # 비균등
             else:
-                out += dx
+                out = out + dx
         
         
         # plot_tensor_distribution(out)

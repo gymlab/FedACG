@@ -215,12 +215,12 @@ class Client():
 
                     torch.nn.utils.clip_grad_norm_(self.model.parameters(), 10)
                     
-                    # Gradient 양자화
-                    with torch.no_grad():
-                        for name, param in self.model.named_parameters():
+                    # # Gradient 양자화
+                    # with torch.no_grad():
+                    #     for name, param in self.model.named_parameters():
 
-                            if param.requires_grad and param.grad is not None:
-                                param.grad.data = grad_Q(param.grad.data).data
+                    #         if param.requires_grad and param.grad is not None:
+                    #             param.grad.data = grad_Q(param.grad.data).data
 
                     
                     self.optimizer.step()
