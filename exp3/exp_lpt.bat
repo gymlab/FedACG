@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 set DATASET=cifar10
-set MODEL=resnet18_WS_LPT
+set MODEL=resnet18_WS_LPT2
 set ALPHA=0.1
 cd ..
 
@@ -14,7 +14,7 @@ for %%B in (6) do (
 
     echo Using BATCH_SIZE=!BATCH_SIZE! with BITS=%%B
     python federated_train.py visible_devices="0" client=base server=base ^
-    exp_name="%MODEL%_IID_B%%B_RAU_BC_only_weight" ^
+    exp_name="%MODEL%_IID_B%%B_RAN_BC_only_weight" ^
     dataset=%DATASET% ^
     trainer.num_clients=100 ^
     split.alpha=%ALPHA% ^

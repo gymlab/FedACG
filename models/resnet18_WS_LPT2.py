@@ -99,18 +99,18 @@ class BasicBlockWS_LPT(nn.Module):
 
     def forward(self, x: torch.Tensor, no_relu: bool = False) -> torch.Tensor:
         
-        out = self.bn1(self.conv1(x))
+        # out = self.bn1(self.conv1(x))
+        
+        # if self.quant is not None:
+        #     out = self.quant(out)
+        
+        # out = F.relu(out)
+        
+        
+        out = F.relu(self.bn1(self.conv1(x)))
         
         if self.quant is not None:
             out = self.quant(out)
-        
-        out = F.relu(out)
-        
-        
-        # out = F.relu(self.bn1(self.conv1(x)))
-        
-        # if self.quant is not None:
-            # out = self.quant(out)
             
         out = self.bn2(self.conv2(out))
         
@@ -120,13 +120,13 @@ class BasicBlockWS_LPT(nn.Module):
         dx = self.downsample(x)
         
         if len(self.downsample) == 0:
-            out += dx
+            out = out + dx
                 
         else:
             if self.quant is not None:
                 out = out + self.quant(dx) # 비균등
             else:
-                out += dx
+                out = out + dx
                 
         
         if not no_relu:
