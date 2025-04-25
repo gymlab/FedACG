@@ -218,41 +218,79 @@ def DANUQ_quantize(x: torch.Tensor,
     
     def bucket_quantize_blockwise(inp) -> torch.Tensor:
         # plot_input_distribution(inp, title='Before Quantization')
-        x_mean = inp.mean()
-        x_std = inp.std(unbiased = True) + 1e-6  # row_std = row_std + 1e-6
+        # x_mean = inp.mean()
+        # x_std = inp.std(unbiased = True) + 1e-10  # row_std = row_std + 1e-6
         
-        if x_std == 0:
-            return inp
+        # if x_std == 0:
+        #     return inp
         
-        x_normed = (inp - x_mean) / x_std
-        indices = torch.bucketize(x_normed, edges, right=False)
-        quantized_normed = q_values_sorted[indices]
+        # x_normed = (inp - x_mean) / x_std
+        # indices = torch.bucketize(x_normed, edges, right=False)
+        # quantized_normed = q_values_sorted[indices]
         
-        return quantized_normed * x_std + x_mean
+        # return quantized_normed * x_std + x_mean
 
+        # new_q_values
+        x_mean = inp.mean()
+        x_std = torch.clamp(inp.std(unbiased = False), min=1e-10)  # row_std = row_std + 1e-6
+        q_values_data = q_values * x_std + x_mean
+        edges_data = 0.5 * (q_values_data[1:] + q_values_data[:-1])
+        indices = torch.bucketize(inp, edges_data, right=False)
+        x_q = q_values_data[indices]
+        x_min2 = x.min()
+        x_max2 = x.max()
+        q_min = q_values_data[q_values_data > x_min2].min()
+        q_max = q_values_data[q_values_data < x_max2].max()
+        
+        x_q = torch.clamp(x_q, min=q_min.item(), max=q_max.item())
+
+        return x_q
     
     if x.dim() <= dim_threshold:
         return bucket_quantize_blockwise(x)
     
     else:
         if block_dim == "B":
+            # B = x.size(0)
+            # x_2d = x.view(B, -1)
+            # row_mean = x_2d.mean(dim=1, keepdim=True)
+            # row_std = x_2d.std(dim=1, keepdim=True, unbiased = True) + 1e-10   # unbiased = True, row_std = row_std + 1e-6
+            # x_normed = (x_2d - row_mean) / row_std
+            # indices = torch.bucketize(x_normed, edges, right=False)
+            # quant_normed = q_values_sorted[indices]
+            # x_deq_2d = quant_normed * row_std + row_mean
+            # return x_deq_2d.view_as(x)
+        
             B = x.size(0)
             x_2d = x.view(B, -1)
+            
+            ### new_q_values
+            row = q_values_sorted.numel()
+            
             row_mean = x_2d.mean(dim=1, keepdim=True)
-            row_std = x_2d.std(dim=1, keepdim=True, unbiased = True) + 1e-6   # unbiased = True, row_std = row_std + 1e-6
-            x_normed = (x_2d - row_mean) / row_std
-            indices = torch.bucketize(x_normed, edges, right=False)
-            quant_normed = q_values_sorted[indices]
-            x_deq_2d = quant_normed * row_std + row_mean
-            return x_deq_2d.view_as(x)
-        
+            row_std = torch.clamp(x_2d.std(dim=1, keepdim=True, unbiased = False), min=1e-10)   # unbiased = True, row_std = row_std + 1e-6
+            # x_normed = (x_2d - row_mean) / row_std
+                                    
+            new_q_values = q_values_sorted.view(1, row) * row_std + row_mean
+            new_edges = 0.5 * (new_q_values[:, 1:] + new_q_values[:, :-1])
+            
+            x_q = torch.empty_like(x_2d)
+            for b in range(B):
+                idx = torch.bucketize(x_2d[b], new_edges[b], right=False)
+                x_q[b] = new_q_values[b][idx]
+                q_min = new_q_values[b][new_q_values[b] >= x_2d[b].min()].min()
+                q_max = new_q_values[b][new_q_values[b] <= x_2d[b].max()].max()
+                x_q[b] = torch.clamp(x_q[b], min=q_min.item(), max=q_max.item())
+                
+            return x_q.view_as(x)
+
         elif block_dim == "BC":
             # plot_tensor_distribution(x, title='Conv Weight Distribution')
             # analyze_normality(x)
             B, C = x.size(0), x.size(1)
             x_2d = x.view(B*C, -1)
             row_mean = x_2d.mean(dim=1, keepdim=True)
-            row_std = x_2d.std(dim=1, keepdim=True, unbiased = False)   # unbiased = True
+            row_std = x_2d.std(dim=1, keepdim=True, unbiased = True) + 1e-10   # unbiased = True
             # print(min(row_std), x.shape)
             zero     = row_std == 0
             row_std_safe = torch.where(zero, torch.ones_like(row_std), row_std)

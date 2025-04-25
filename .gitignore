@@ -19,3 +19,4 @@ tmp
 grad_output_distribution
 grad_output_logs/
 ./weight_figure/*
+./fig

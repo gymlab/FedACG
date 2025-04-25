@@ -10,7 +10,7 @@ import tqdm
 import wandb
 import gc
 import psutil
-
+import re
 import pickle, os
 import numpy as np
 
@@ -37,6 +37,47 @@ from omegaconf import DictConfig,OmegaConf
 import matplotlib.pyplot as plt
 
 from utils.qunat_function import AQD_update, WSQ_update, compute_p_i
+
+def save_conv1_weight_hist(model: torch.nn.Module,
+                           save_dir: str,
+                           tag: str,
+                           bins: int = 300,
+                           clip_value: float = 1.0):
+    """
+    모델에서 conv1.weight 만 골라 히스토그램을 PNG로 저장.
+    클리핑된 분포와 절대값 최대값을 그래프에 표시.
+    """
+    os.makedirs(save_dir, exist_ok=True)
+    scrub = lambda s: re.sub(r'[^\w\-]', '_', s)  # 파일명 안전 문자만
+    for name, param in model.named_parameters():
+        if name.endswith("conv1.weight"):
+            w = param.detach().cpu().flatten()
+            w_np = w.numpy()
+            zero_count = torch.sum(w == 0).item()
+            abs_max = float(torch.max(torch.abs(w)).item())
+            # 클리핑해서 시각화용 데이터 만들기
+            w_clipped = np.clip(w_np, -clip_value, clip_value)
+            # 히스토그램 플롯
+            plt.figure(figsize=(5, 3))
+            plt.hist(w_clipped, bins=bins, alpha=0.7, range=(-clip_value, clip_value))
+            plt.title(f"{tag}")
+            plt.xlabel("weight value")
+            plt.ylabel("#elements")
+            # 그래프 내 텍스트 표시
+            plt.text(0.95, 0.95, f"Zero count: {zero_count}\nAbs max: {abs_max:.4f}",
+                     horizontalalignment='right',
+                     verticalalignment='top',
+                     transform=plt.gca().transAxes,
+                     fontsize=10, bbox=dict(facecolor='white', alpha=0.6, edgecolor='gray'))
+            # 저장
+            fname = f"{scrub(tag)}_conv1.png"
+            plt.tight_layout()
+            plt.savefig(os.path.join(save_dir, fname), dpi=200)
+            plt.close()
+            print(f"[saved] {fname}")
+            return  # 하나만 저장하고 끝냄
+    print("[warn] conv1.weight not found in model.")
+            
 
 
 @TRAINER_REGISTRY.register()
@@ -195,8 +236,7 @@ class Trainer():
                 
         for epoch in range(self.start_round, self.global_rounds):
             
-            if epoch == 71:
-                print("71")
+            save_conv1_weight_hist(self.model, save_dir="./fig/conv1_weight", tag=f"global_ep{epoch}")
             self.lr_update(epoch=epoch)
             current_lr = self.lr
 

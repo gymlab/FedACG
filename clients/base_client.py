@@ -191,15 +191,19 @@ class Client():
             
         # LPT
         else:
-            weight_quantizer = lambda x: quantize_block(
-            x, self.args.quantizer.quantization_bits, -1, self.args.quantizer.quant_type, self.args.quantizer.small_block, self.args.quantizer.block_dim, self.args.quantizer.uniform_mode)
+            weight_non_quantizer = lambda x: quantize_block(
+            x, self.args.quantizer.quantization_bits, -1, self.args.quantizer.quant_type, self.args.quantizer.small_block, self.args.quantizer.block_dim, "DANUQ")
             
+            weight_uni_quantizer = lambda x: quantize_block(
+            x, self.args.quantizer.quantization_bits, -1, self.args.quantizer.quant_type, self.args.quantizer.small_block, self.args.quantizer.block_dim, "BFP")
+        
             grad_quantizer = lambda x: quantize_block(
             x, self.args.quantizer.quantization_bits, -1, self.args.quantizer.quant_type, self.args.quantizer.small_block, self.args.quantizer.block_dim, self.args.quantizer.uniform_mode)
             
-            quantizer = {'weight_Q' : weight_quantizer , 'grad_Q' : grad_quantizer} 
+            quantizer = {'weight_NUQ' : weight_non_quantizer ,'weight_UQ' : weight_uni_quantizer , 'grad_Q' : grad_quantizer} 
             
-            weight_Q = quantizer['weight_Q']
+            weight_NUQ = quantizer['weight_NUQ']
+            weight_UQ = quantizer['weight_UQ']
             grad_Q = quantizer['grad_Q']
         
             for local_epoch in range(self.args.trainer.local_epochs):
@@ -215,7 +219,7 @@ class Client():
 
                     torch.nn.utils.clip_grad_norm_(self.model.parameters(), 10)
                     
-                    # # Gradient 양자화
+                    # Gradient 양자화
                     # with torch.no_grad():
                     #     for name, param in self.model.named_parameters():
 
@@ -228,7 +232,11 @@ class Client():
                     # 가중치 양자화
                     with torch.no_grad():
                         for name, p in self.model.named_parameters():
-                            p.data = weight_Q(p.data).data
+                            if 'conv1.weight' in name or 'conv2.weight' in name or 'fc.weight' in name:
+                                p.data = weight_NUQ(p.data).data
+                            else:
+                                p.data = weight_UQ(p.data).data
+                    
 
 
                     loss_meter.update(loss.item(), images.size(0))
