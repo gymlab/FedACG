@@ -34,23 +34,32 @@ def build_encoder(args):
     
     # Activation 양자화
     if args.quantizer.LPT_name == 'LPT':
-        quant_model = lambda: BlockQuantizer(-1,-1, args.quantizer.quant_type,
-                                             args.quantizer.small_block, args.quantizer.block_dim, args.quantizer.uniform_mode)
+        quant_model = lambda: BlockQuantizer( args.quantizer.quantization_bits, args.quantizer.quantization_bits, args.quantizer.quant_type,
+                                             args.quantizer.small_block, args.quantizer.block_dim, 'DANUQ')
         
-        quant_model2 = lambda: BlockQuantizer(-1,-1, args.quantizer.quant_type,
+        quant_model2 = lambda: BlockQuantizer_ReLU( args.quantizer.quantization_bits, args.quantizer.quantization_bits, args.quantizer.quant_type,
+                                             args.quantizer.small_block, args.quantizer.block_dim)
+        
+        quant_model3 = lambda: BlockQuantizer( args.quantizer.quantization_bits, args.quantizer.quantization_bits, args.quantizer.quant_type,
                                              args.quantizer.small_block, args.quantizer.block_dim, "BFP")
         
         quant_function = quant_model()
         quant_function2 = quant_model2()
+        quant_function3 = quant_model3()
         
         server_model = lambda: BlockQuantizer(-1 , -1, args.quantizer.quant_type,
                                              args.quantizer.small_block, args.quantizer.block_dim)
         
-        server_model2 = lambda: BlockQuantizer(-1 , -1, args.quantizer.quant_type,
+        server_model2 = lambda: BlockQuantizer_ReLU(-1 , -1, args.quantizer.quant_type,
+                                             args.quantizer.small_block, args.quantizer.block_dim)
+        
+        server_model3 = lambda: BlockQuantizer(-1 , -1, args.quantizer.quant_type,
                                              args.quantizer.small_block, args.quantizer.block_dim)
          
         server_quant_function = server_model()
         server_quant_function2 = server_model2()
+        server_quant_function3 = server_model3()
+        
     
     # if args.quantizer.get("quant", False):
     #     args.model["quant"] = quant_function
@@ -59,8 +68,8 @@ def build_encoder(args):
     
     
     if args.quantizer.LPT_name == 'LPT':
-        encoder = ENCODER_REGISTRY.get(args.model.name)(args, num_classes, quant = quant_function, quant2 = quant_function2, **args.model) if len(args.model.name) > 0 else None
-        eval_encoder= ENCODER_REGISTRY.get(args.model.name)(args, num_classes, quant = server_quant_function, quant2 = server_quant_function2, **args.model) if len(args.model.name) > 0 else None
+        encoder = ENCODER_REGISTRY.get(args.model.name)(args, num_classes, quant = quant_function, quant2 = quant_function2, quant3 = quant_function3, **args.model) if len(args.model.name) > 0 else None
+        eval_encoder= ENCODER_REGISTRY.get(args.model.name)(args, num_classes, quant = server_quant_function, quant2 = server_quant_function2, quant3 = server_quant_function3, **args.model) if len(args.model.name) > 0 else None
     else:
         encoder = ENCODER_REGISTRY.get(args.model.name)(args, num_classes, **args.model) if len(args.model.name) > 0 else None
         eval_encoder = ENCODER_REGISTRY.get(args.model.name)(args, num_classes, **args.model) if len(args.model.name) > 0 else None

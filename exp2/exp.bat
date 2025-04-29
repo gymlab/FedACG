@@ -2,11 +2,11 @@ setlocal enabledelayedexpansion
 
 @echo off
 set DATASET=cifar10
-set MODEL=resnet18_WS_LPT
+set MODEL=resnet18_WS_LPT2
 set ALPHA=0.6
 cd ..
 
-for %%N in (4) do (
+for %%N in (6) do (
     if "%DATASET%"=="tinyimagenet" (
         set BATCH_SIZE=100
     ) else (

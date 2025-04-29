@@ -12,7 +12,7 @@ momentum: 0.1
 # LPT
 quant: True
 quant_type: 'stochastic'
-quantization_bits: 8
-small_block: 'FC'
+quantization_bits: 6
+small_block: 'None'
 block_dim: 'B'
 uniform_mode: 'BFP'

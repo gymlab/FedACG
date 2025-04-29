@@ -220,11 +220,11 @@ class Client():
                     torch.nn.utils.clip_grad_norm_(self.model.parameters(), 10)
                     
                     # Gradient 양자화
-                    # with torch.no_grad():
-                    #     for name, param in self.model.named_parameters():
+                    with torch.no_grad():
+                        for name, param in self.model.named_parameters():
 
-                    #         if param.requires_grad and param.grad is not None:
-                    #             param.grad.data = grad_Q(param.grad.data).data
+                            if param.requires_grad and param.grad is not None:
+                                param.grad.data = grad_Q(param.grad.data).data
 
                     
                     self.optimizer.step()
@@ -232,10 +232,11 @@ class Client():
                     # 가중치 양자화
                     with torch.no_grad():
                         for name, p in self.model.named_parameters():
-                            if 'conv1.weight' in name or 'conv2.weight' in name or 'fc.weight' in name:
-                                p.data = weight_NUQ(p.data).data
-                            else:
-                                p.data = weight_UQ(p.data).data
+                            p.data = weight_NUQ(p.data).data
+                            # if 'conv1.weight' in name or 'conv2.weight' in name or 'fc.weight' in name:
+                            #     p.data = weight_NUQ(p.data).data
+                            # else:
+                            #     p.data = weight_UQ(p.data).data
                     
 
 

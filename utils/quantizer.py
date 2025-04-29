@@ -11,6 +11,7 @@ import torch
 import numpy as np
 import time
 from scipy.stats import shapiro, skew, kurtosis, norm, entropy, wasserstein_distance
+from torch.distributions.normal import Normal
 
 
 def plot_input_distribution(inp: torch.Tensor, title='Input Distribution'):
@@ -60,9 +61,10 @@ Q_VALUES_TABLE = {
     # 3: torch.tensor([-1.224, 0, 0.7646, 1.7242]   ),
     4: torch.tensor([-2.6536, -1.9735, -1.508, -1.149, -0.8337, -0.5439, -0.2686, 0.,
             0.2686, 0.5439, 0.8337, 1.149, 1.508, 1.9735, 2.6536]),
-    6: torch.tensor([-2.154, -1.863, -1.676, -1.534, -1.418, -1.318, -1.23, -1.15, -1.078, -1.01, -0.947, -0.887, -0.831, -0.776, -0.725, -0.674, -0.626, -0.579, -0.533, -0.489,
-    -0.445, -0.402, -0.36, -0.319, -0.278, -0.237, -0.197, -0.157, -0.118, -0.078, -0.039, 0, 0.038, 0.076, 0.114, 0.153, 0.191, 0.23, 0.269, 0.309, 0.349, 0.389, 0.431, 0.473, 0.516,
-    0.56, 0.605, 0.651, 0.699, 0.748, 0.799, 0.852, 0.908, 0.967, 1.03, 1.097, 1.169, 1.248, 1.335, 1.434, 1.55, 1.691, 1.876, 2.166]),
+    6: torch.tensor([ -2.099, -1.836, -1.659, -1.524, -1.411, -1.314, -1.228, -1.15, -1.079, -1.013, -0.95, -0.892, -0.836, -0.783, -0.732, -0.682, -0.635, -0.589, -0.544, -0.5,
+    -0.457, -0.414, -0.373, -0.332, -0.292, -0.252, -0.213, -0.174, -0.135, -0.096,-0.058, -0.019, 0.019, 0.058, 0.096, 0.135, 0.174, 0.213, 0.252, 0.292,
+    0.332, 0.373, 0.414, 0.457, 0.5, 0.544, 0.589, 0.635, 0.682, 0.732, 0.783, 0.836, 0.892, 0.95, 1.013, 1.079, 1.15, 1.228, 1.314, 1.411, 1.524, 
+    1.659, 1.836, 2.099]),
     8: torch.tensor([-2.418, -2.154, -1.987, -1.863, -1.762, -1.676, -1.601, -1.534, -1.473, -1.418, -1.366, -1.318, -1.273, -1.23, -1.189, -1.15, -1.113, -1.078, -1.043, -1.01,
                      -0.978, -0.947, -0.917, -0.887, -0.858, -0.831, -0.803, -0.776, -0.75, -0.725, -0.699, -0.674, -0.65, -0.626, -0.602, -0.579, -0.556, -0.533, -0.511, -0.489,
                      -0.467, -0.445, -0.424, -0.402, -0.381, -0.36, -0.339, -0.319, -0.298, -0.278, -0.257, -0.237, -0.217, -0.197, -0.177, -0.157, -0.138, -0.118, -0.098, -0.078,
@@ -79,52 +81,65 @@ class BlockRounding(torch.autograd.Function):
         self.small_block = small_block
         self.block_dim = block_dim
         self.quant_flag = quant_flag
-        # return block_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
         
         if self.quant_flag == "DANUQ":
             return DANUQ_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
         elif self.quant_flag == "BFP":
             return block_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
         
-        # return StochNormQuant_parallel(x, forward_bits, small_block=self.small_block, block_dim=self.block_dim)
-    
-        # with torch.no_grad():
-            # q = DANUQ_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
-        #     q = block_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
-            
-        # return x + (q - x).detach()
     
     @staticmethod
     def backward(self, grad_output):
         if self.needs_input_grad[0]:
             if self.backward_bits != -1:
                 
-                if self.quant_flag == "BFP":
-                    grad_input = block_quantize(grad_output, self.backward_bits, self.mode,
+                grad_input = block_quantize(grad_output, self.backward_bits, self.mode,
                                              small_block=self.small_block, block_dim=self.block_dim)
+                # if self.quant_flag == "BFP":
+                #     grad_input = block_quantize(grad_output, self.backward_bits, self.mode,
+                #                              small_block=self.small_block, block_dim=self.block_dim)
                     
-                elif self.quant_flag == "DANUQ":
-                    grad_input = DANUQ_quantize(grad_output, self.backward_bits, self.mode,
-                                            small_block=self.small_block, block_dim=self.block_dim)
-                
-                # save_grad_output_distribution(grad_output)
-               
-                                            
-                # grad_input = StochNormQuant_parallel(grad_output, self.backward_bits, small_block=self.small_block, block_dim=self.block_dim)
-                # with torch.no_grad():
-                #     gq = DANUQ_quantize(grad_output, self.backward_bits, self.mode,
+                # elif self.quant_flag == "DANUQ":
+                #     grad_input = DANUQ_quantize(grad_output, self.backward_bits, self.mode,
                 #                             small_block=self.small_block, block_dim=self.block_dim)
-                    # gq = block_quantize(grad_output, self.backward_bits, self.mode,
-                                            # small_block=self.small_block, block_dim=self.block_dim)
-                # grad_input = grad_output + (gq - grad_output).detach()
                 
             else:
                 grad_input = grad_output
         return grad_input, None, None, None, None, None, None
     
+
+class BlockRounding_ReLU(torch.autograd.Function):
+    @staticmethod
+    def forward(self, x, forward_bits, backward_bits, mode, mean, std, small_block="None", block_dim="B", quant_flag = "DANUQ"):
+        self.backward_bits = backward_bits
+        self.mode = mode
+        self.mean = mean
+        self.std = std
+        if forward_bits == -1: return x
+        self.small_block = small_block
+        self.block_dim = block_dim
+        self.quant_flag = quant_flag
+        
+        return DANUQ_ReLU_quantize(x, forward_bits, self.mode, self.mean, self.std, small_block=self.small_block, block_dim=self.block_dim)
+        
+    
+    @staticmethod
+    def backward(self, grad_output):
+        if self.needs_input_grad[0]:
+            if self.backward_bits != -1:
+                
+                # grad_input = DANUQ_quantize(grad_output, self.backward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
+                grad_input = block_quantize(grad_output, self.backward_bits, self.mode,
+                                             small_block=self.small_block, block_dim=self.block_dim)
+                
+            else:
+                grad_input = grad_output
+                
+        return grad_input, None, None, None, None, None, None, None, None
+    
 class BlockQuantizer(nn.Module):
     def __init__(self, wl_activate, wl_error, mode,
-            small_block="None", block_dim="B", quant_flag = "DANUQ"):
+            small_block="None", block_dim="B", quant_flag = "BFP"):
         super(BlockQuantizer, self).__init__()
         self.wl_activate = wl_activate
         self.wl_error = wl_error
@@ -135,6 +150,21 @@ class BlockQuantizer(nn.Module):
     def forward(self, x):
         return quantize_block(x, self.wl_activate,
                               self.wl_error, self.mode,
+                              self.small_block, self.block_dim, self.quant_flag)
+        
+class BlockQuantizer_ReLU(nn.Module):
+    def __init__(self, wl_activate, wl_error, mode,
+            small_block="None", block_dim="B", quant_flag = "DANUQ"):
+        super(BlockQuantizer_ReLU, self).__init__()
+        self.wl_activate = wl_activate
+        self.wl_error = wl_error
+        self.mode = mode
+        self.small_block="None"
+        self.block_dim="B"
+        self.quant_flag= quant_flag
+    def forward(self, x, mean, std):
+        return quantize_block_ReLU(x, self.wl_activate,
+                              self.wl_error, self.mode, mean, std,
                               self.small_block, self.block_dim, self.quant_flag)
         
 def block_quantize(data, bits, mode, ebit=8, small_block="FC", block_dim="B"):
@@ -196,6 +226,43 @@ def block_quantize(data, bits, mode, ebit=8, small_block="FC", block_dim="B"):
         raise
     return temp
 
+def DANUQ_ReLU_quantize(
+        x: torch.Tensor,
+        bits: int,
+        mode: str,
+        mean: torch.Tensor,
+        std: torch.Tensor,
+        ebit: int = 8,
+        small_block: str = "FC",
+        block_dim: str = "B",
+        sigma_clip: float = torch.tensor(2.1)) -> torch.Tensor:
+
+    n_levels = 2 ** bits                      
+    norm = Normal(0.0, 1.0)
+
+    z0       = - mean / (std + 1e-10)   
+    cdf_0    = norm.cdf(z0)                    
+    cdf_max  = norm.cdf(sigma_clip)
+    # cdf_max = 1           
+    pos_mass = cdf_max - cdf_0
+
+    target = cdf_0 + pos_mass * torch.linspace(
+        1/(n_levels-1), 1.0, steps=n_levels-1, device=x.device) # Can be fixed
+
+    z_vals        = norm.icdf(target)        
+    q_values_data = torch.cat(
+        [torch.zeros(1, device=x.device),   
+         z_vals * std + mean])
+
+    edges_data = 0.5 * (q_values_data[1:] + q_values_data[:-1])
+
+    indices = torch.bucketize(x, edges_data, right=False)
+    x_q = q_values_data[indices]
+
+    x_q = torch.clamp(x_q, min=q_values_data[0].item(),
+                            max=q_values_data[-1].item())
+    return x_q
+
 def DANUQ_quantize(x: torch.Tensor,
                    bits: int,
                    mode: str,
@@ -217,20 +284,7 @@ def DANUQ_quantize(x: torch.Tensor,
         raise ValueError(f"Invalid small_block option: {small_block}")
     
     def bucket_quantize_blockwise(inp) -> torch.Tensor:
-        # plot_input_distribution(inp, title='Before Quantization')
-        # x_mean = inp.mean()
-        # x_std = inp.std(unbiased = True) + 1e-10  # row_std = row_std + 1e-6
-        
-        # if x_std == 0:
-        #     return inp
-        
-        # x_normed = (inp - x_mean) / x_std
-        # indices = torch.bucketize(x_normed, edges, right=False)
-        # quantized_normed = q_values_sorted[indices]
-        
-        # return quantized_normed * x_std + x_mean
 
-        # new_q_values
         x_mean = inp.mean()
         x_std = torch.clamp(inp.std(unbiased = False), min=1e-10)  # row_std = row_std + 1e-6
         q_values_data = q_values * x_std + x_mean
@@ -363,3 +417,4 @@ def add_r_(data):
     data.add_(r)
     
 quantize_block = BlockRounding.apply
+quantize_block_ReLU = BlockRounding_ReLU.apply

@@ -236,7 +236,7 @@ class Trainer():
                 
         for epoch in range(self.start_round, self.global_rounds):
             
-            save_conv1_weight_hist(self.model, save_dir="./fig/conv1_weight", tag=f"global_ep{epoch}")
+            # save_conv1_weight_hist(self.model, save_dir="./fig/conv1_weight", tag=f"global_ep{epoch}")
             self.lr_update(epoch=epoch)
             current_lr = self.lr
 
