@@ -85,7 +85,7 @@ class BlockRounding(torch.autograd.Function):
         
         
         if self.quant_flag == "DANUQ":
-            return DANUQ_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
+            return bucket_quantize_blockwise_mask_zero(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
         elif self.quant_flag == "BFP":
             return block_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
         
@@ -116,6 +116,7 @@ class BlockRounding(torch.autograd.Function):
                 #                             small_block=self.small_block, block_dim=self.block_dim)
                 
             else:
+                # layer_name = self.__class__.__name__
                 grad_input = grad_output
         return grad_input, None, None, None, None, None, None
     
@@ -148,6 +149,7 @@ class BlockRounding_ReLU(torch.autograd.Function):
                 grad_input = bucket_quantize_blockwise_mask_zero(grad_output, self.backward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
                 
             else:
+                # layer_name = self.__class__.__name__
                 grad_input = grad_output
                 
         return grad_input, None, None, None, None, None, None, None, None

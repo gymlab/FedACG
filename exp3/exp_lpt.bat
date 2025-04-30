@@ -14,14 +14,14 @@ for %%B in (6) do (
 
     echo Using BATCH_SIZE=!BATCH_SIZE! with BITS=%%B
     python federated_train.py visible_devices="0" client=base server=base ^
-    exp_name="%MODEL%_IID_B%%B_RAN_BC_only_weight" ^
+    exp_name="%MODEL%_IID_B%%B_tt" ^
     dataset=%DATASET% ^
     trainer.num_clients=100 ^
     split.alpha=%ALPHA% ^
     trainer.participation_rate=0.05 ^
     model.moving_average=False ^
     batch_size=!BATCH_SIZE! ^
-    quantizer=LPT quantizer.quantization_bits=%%B quantizer.block_dim="BC" ^
+    quantizer=LPT quantizer.quantization_bits=%%B ^
     wandb=True ^
     model=%MODEL% ^
     project="BMVC_2025_3" ^

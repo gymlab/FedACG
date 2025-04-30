@@ -98,11 +98,14 @@ class WSConv2d(nn.Conv2d):
 class BasicBlockWS_LPT(nn.Module):
     expansion = 1
 
-    def __init__(self, in_planes, planes, stride=1, use_bn_layer=False, rho=1e-3, init_mode="kaiming_normal", quant = None, quant2 = None, quant3 = None):
+    def __init__(self, in_planes, planes, stride=1, use_bn_layer=False, rho=1e-3, init_mode="kaiming_normal", quant = None, quant2 = None, quant3 = None, quant4 = None, quant5 = None, quant6 = None,):
         super(BasicBlockWS_LPT, self).__init__()
         self.quant = quant
         self.quant2 = quant2
         self.quant3 = quant3 
+        self.quant4 = quant4
+        self.quant5 = quant5
+        self.quant6 = quant6 
         
         self.conv1 = WSConv2d(
             in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False, rho=rho, init_mode=init_mode)
@@ -138,15 +141,10 @@ class BasicBlockWS_LPT(nn.Module):
 
     def forward(self, x: torch.Tensor, no_relu: bool = False) -> torch.Tensor:
         
-        # out = self.bn1(self.conv1(x))
+        # backward unq
+        c_out = self.quant3(x)
         
-        # if self.quant is not None:
-        #     out = self.quant(out)
-        
-        # out = F.relu(out)
-        
-        
-        out = self.bn1(self.conv1(x))
+        out = self.bn1(self.conv1(c_out))
         out_mean = out.mean()
         out_std = out.std(unbiased=False)
         # relu이전의 통계값 계산
@@ -156,25 +154,24 @@ class BasicBlockWS_LPT(nn.Module):
         
         # plot_tensor_distribution(out)
         # relu 후 양자화
-        if self.quant2 is not None:
-            out = self.quant2(out, out_mean, out_std)
+        if self.quant is not None:
+            out = self.quant(out, out_mean, out_std)
             # out = self.quant(out)
             
         out = self.bn2(self.conv2(out))
         
         # plot_tensor_distribution(out)
-        if self.quant is not None:
-            out = self.quant(out)
+        if self.quant2 is not None:
+            out = self.quant2(out)
             
-        dx = self.downsample(x)
+        dx = self.downsample(c_out)
         
         if len(self.downsample) != 0:
-            if self.quant is not None:
+            if self.quant2 is not None:
                 # plot_tensor_distribution(dx)
-                out = out + self.quant(dx)
+                out = out + self.quant2(dx)
             else:
                 out = out + dx
-                
         else:
             out = out + dx
                 
@@ -189,14 +186,14 @@ class BasicBlockWS_LPT(nn.Module):
         
         
         if not no_relu:
-            if self.quant2 is not None:
+            if self.quant is not None:
                 # plot_tensor_distribution(out)
-                out = self.quant(out)
+                out = self.quant(out, out_mean, out_std)
                 # out = self.quant(out)
-        else:
-            if self.quant2 is not None:
-                # plot_tensor_distribution(out)
-                out = self.quant(out)
+        # else:
+        #     if self.quant is not None:
+        #         # plot_tensor_distribution(out)
+        #         out = self.quant(out, out_mean, out_std)
             
         return out
 
@@ -204,7 +201,7 @@ class BasicBlockWS_LPT(nn.Module):
 class BottleneckWS_LPT(nn.Module):
     expansion = 4
     
-    def __init__(self, in_planes, planes, stride=1, use_bn_layer=False, rho=1e-3, init_mode="kaiming_normal", quant = None):
+    def __init__(self, in_planes, planes, stride=1, use_bn_layer=False, rho=1e-3, init_mode="kaiming_normal", quant = None, quant2 = None, quant3 = None, quant4 = None, quant5 = None, quant6 = None):
         super(BottleneckWS_LPT, self).__init__()
         
         self.quant = quant
@@ -264,7 +261,7 @@ class BottleneckWS_LPT(nn.Module):
 
 class ResNet_WSConv_LPT(nn.Module):
     def __init__(self, block, num_blocks, num_classes=10, l2_norm=False, use_pretrained=False, use_bn_layer=False,
-                 last_feature_dim=512, rho=1e-3, init_mode="kaiming_normal", quant = None, quant2 = None, quant3 = None, **kwargs):
+                 last_feature_dim=512, rho=1e-3, init_mode="kaiming_normal", quant = None, quant2 = None, quant3 = None, quant4 = None, quant5 = None, quant6 = None, **kwargs):
         
         #use_pretrained means whether to use torch torchvision.models pretrained model, and use conv1 kernel size as 7
         
@@ -275,6 +272,9 @@ class ResNet_WSConv_LPT(nn.Module):
         self.quant = quant
         self.quant2 = quant2
         self.quant3 = quant3
+        self.quant4 = quant4
+        self.quant5 = quant5
+        self.quant6 = quant6
         
         if use_pretrained:
             conv1_kernel_size = 7
@@ -284,10 +284,10 @@ class ResNet_WSConv_LPT(nn.Module):
                                stride=1, padding=1, bias=False, rho=rho, init_mode=init_mode)
         self.bn1 = nn.GroupNorm(2, 64) if not use_bn_layer else nn.BatchNorm2d(64) 
         
-        self.layer1 = self._make_layer(block, 64, num_blocks[0], stride=1, use_bn_layer=use_bn_layer, rho=rho, init_mode=init_mode, quant = self.quant, quant2 = self.quant2, quant3 = self.quant3)
-        self.layer2 = self._make_layer(block, 128, num_blocks[1], stride=2, use_bn_layer=use_bn_layer, rho=rho, init_mode=init_mode, quant= self.quant, quant2 = self.quant2, quant3 = self.quant3)
-        self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2, use_bn_layer=use_bn_layer, rho=rho, init_mode=init_mode, quant= self.quant, quant2 = self.quant2, quant3 = self.quant3)
-        self.layer4 = self._make_layer(block, last_feature_dim, num_blocks[3], stride=2, use_bn_layer=use_bn_layer, rho=rho, init_mode=init_mode, quant= self.quant, quant2 = self.quant2, quant3 = self.quant3)
+        self.layer1 = self._make_layer(block, 64, num_blocks[0], stride=1, use_bn_layer=use_bn_layer, rho=rho, init_mode=init_mode, quant = self.quant, quant2 = self.quant2, quant3 = self.quant3, quant4 = self.quant4, quant5 = self.quant5, quant6 = self.quant6)
+        self.layer2 = self._make_layer(block, 128, num_blocks[1], stride=2, use_bn_layer=use_bn_layer, rho=rho, init_mode=init_mode, quant= self.quant, quant2 = self.quant2, quant3 = self.quant3, quant4 = self.quant4, quant5 = self.quant5, quant6 = self.quant6)
+        self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2, use_bn_layer=use_bn_layer, rho=rho, init_mode=init_mode, quant= self.quant, quant2 = self.quant2, quant3 = self.quant3, quant4 = self.quant4, quant5 = self.quant5, quant6 = self.quant6)
+        self.layer4 = self._make_layer(block, last_feature_dim, num_blocks[3], stride=2, use_bn_layer=use_bn_layer, rho=rho, init_mode=init_mode, quant= self.quant, quant2 = self.quant2, quant3 = self.quant3, quant4 = self.quant4, quant5 = self.quant5, quant6 = self.quant6)
 
         self.logit_detach = False        
 
@@ -321,11 +321,11 @@ class ResNet_WSConv_LPT(nn.Module):
     def get_linear(self):
         return nn.Linear
 
-    def _make_layer(self, block, planes, num_blocks, stride, use_bn_layer=False, rho=1e-3, init_mode="kaiming_normal", quant = None, quant2 = None, quant3 = None):
+    def _make_layer(self, block, planes, num_blocks, stride, use_bn_layer=False, rho=1e-3, init_mode="kaiming_normal", quant = None, quant2 = None, quant3 = None, quant4 = None, quant5 = None, quant6 = None):
         strides = [stride] + [1]*(num_blocks-1)
         layers = []
         for stride in strides:
-            layers.append(block(self.in_planes, planes, stride, use_bn_layer=use_bn_layer, rho=rho, init_mode=init_mode, quant= self.quant, quant2 = self.quant2, quant3 = self.quant3))
+            layers.append(block(self.in_planes, planes, stride, use_bn_layer=use_bn_layer, rho=rho, init_mode=init_mode, quant= self.quant, quant2 = self.quant2, quant3 = self.quant3, quant4 = self.quant4, quant5 = self.quant5, quant6 = self.quant6))
             self.in_planes = planes * block.expansion
         return nn.Sequential(*layers)
 
@@ -417,8 +417,8 @@ class ResNet_WS_LPT(ResNet_WSConv_LPT):
             out0 = F.relu(out0)
             # plot_tensor_distribution(out0)
 
-            if self.quant2 is not None:
-                out0 = self.quant2(out0, out_mean, out_std)
+            if self.quant is not None:
+                out0 = self.quant(out0, out_mean, out_std)
                 # out0 = self.quant(out0)
 
             out = out0
@@ -426,32 +426,59 @@ class ResNet_WS_LPT(ResNet_WSConv_LPT):
                 sub_norelu = (i == len(self.layer1) - 1)
                 out = sublayer(out, no_relu=sub_norelu)
             results['layer1'] = out
+            
+            out_mean = out.mean()
+            out_std = out.std(unbiased= False)
+            
             out = F.relu(out)
+            
+            if self.quant is not None:
+                out = self.quant(out, out_mean, out_std)
 
             for i, sublayer in enumerate(self.layer2):
                 sub_norelu = (i == len(self.layer2) - 1)
                 out = sublayer(out, no_relu=sub_norelu)
             results['layer2'] = out
+            out_mean = out.mean()
+            out_std = out.std(unbiased= False)
+            
             out = F.relu(out)
+            
+            if self.quant is not None:
+                out = self.quant(out, out_mean, out_std)
 
             for i, sublayer in enumerate(self.layer3):
                 sub_norelu = (i == len(self.layer3) - 1)
                 out = sublayer(out, no_relu=sub_norelu)
             results['layer3'] = out
+            out_mean = out.mean()
+            out_std = out.std(unbiased= False)
+            
             out = F.relu(out)
+            
+            if self.quant is not None:
+                out = self.quant(out, out_mean, out_std)
 
             for i, sublayer in enumerate(self.layer4):
                 sub_norelu = (i == len(self.layer4) - 1)
                 out = sublayer(out, no_relu=sub_norelu)
             results['layer4'] = out
+            out_mean = out.mean()
+            out_std = out.std(unbiased= False)
+            
             out = F.relu(out)
+            
+            if self.quant is not None:
+                out = self.quant(out, out_mean, out_std)
             
         else:
             out0 = self.bn1(self.conv1(x))
+            out_mean = out.mean()
+            out_std = out.std(unbiased=False)
             out0 = F.relu(out0)
             
-            if self.quant is not None:
-                out0 = self.quant(out0)
+            if self.quant3 is not None:
+                out0 = self.quant3(out0)
             
             results['layer0'] = out0
 
@@ -477,8 +504,8 @@ class ResNet_WS_LPT(ResNet_WSConv_LPT):
 
         # plot_tensor_distribution(logit)
         
-        if self.quant3 is not None:
-            logit = self.quant3(logit)
+        if self.quant4 is not None:
+            logit = self.quant4(logit)
         
         results['feature'] = out
         results['logit'] = logit
@@ -489,8 +516,8 @@ class ResNet_WS_LPT(ResNet_WSConv_LPT):
 @ENCODER_REGISTRY.register()
 class ResNet18_WS_LPT2(ResNet_WS_LPT):
     
-    def __init__(self, args: DictConfig, num_classes: int = 10, quant = None, quant2 = None, quant3 = None, **kwargs):
-        super().__init__(BasicBlockWS_LPT, [2, 2, 2, 2], num_classes=num_classes, quant= quant, quant2 = quant2, quant3 = quant3, **kwargs
+    def __init__(self, args: DictConfig, num_classes: int = 10, quant = None, quant2 = None, quant3 = None, quant4= None, quant5= None, quant6= None, **kwargs):
+        super().__init__(BasicBlockWS_LPT, [2, 2, 2, 2], num_classes=num_classes, quant= quant, quant2 = quant2, quant3 = quant3, quant4 = quant4, quant5 = quant5, quant6 = quant6, **kwargs
                         #  l2_norm=args.model.l2_norm,
                         #  use_pretrained=args.model.pretrained, use_bn_layer=args.model.use_bn_layer
                          )
