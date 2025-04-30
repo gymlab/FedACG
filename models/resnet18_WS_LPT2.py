@@ -13,10 +13,47 @@ from models.build import ENCODER_REGISTRY
 from typing import Dict
 from omegaconf import DictConfig
 import torch.nn.init as init
+import matplotlib.pyplot as plt
+import numpy as np
+import time, os
 
 import logging
 logger = logging.getLogger(__name__)
 
+def plot_tensor_distribution(tensor: torch.Tensor, 
+                              title: str = "Tensor Distribution", 
+                              bins: int = 100, 
+                              save_path: str = "./tensor_distribution.png",
+                              add_timestamp: bool = True):
+
+    if isinstance(tensor, torch.Tensor):
+        tensor = tensor.detach().cpu().numpy()
+    elif isinstance(tensor, np.ndarray):
+        tensor = tensor.copy()
+    else:
+        raise ValueError("Input must be a torch.Tensor or numpy.ndarray.")
+
+    tensor_flat = tensor.flatten()
+
+    # 저장 경로 수정: 타임스탬프 추가
+    if add_timestamp:
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        base, ext = os.path.splitext(save_path)
+        save_path = f"./weight_figure/{base}_{timestamp}{ext}"
+
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+    plt.figure()
+    plt.hist(tensor_flat, bins=bins)
+    plt.title(title)
+    plt.xlabel("Value")
+    plt.ylabel("Frequency")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(save_path)
+    plt.close()
+    
+    
 class WSConv2d(nn.Conv2d):
 
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
@@ -117,6 +154,7 @@ class BasicBlockWS_LPT(nn.Module):
         out = F.relu(out)
         # out = F.relu(self.bn1(self.conv1(x)))
         
+        # plot_tensor_distribution(out)
         # relu 후 양자화
         if self.quant2 is not None:
             out = self.quant2(out, out_mean, out_std)
@@ -124,6 +162,7 @@ class BasicBlockWS_LPT(nn.Module):
             
         out = self.bn2(self.conv2(out))
         
+        # plot_tensor_distribution(out)
         if self.quant is not None:
             out = self.quant(out)
             
@@ -131,9 +170,13 @@ class BasicBlockWS_LPT(nn.Module):
         
         if len(self.downsample) != 0:
             if self.quant is not None:
+                # plot_tensor_distribution(dx)
                 out = out + self.quant(dx)
             else:
                 out = out + dx
+                
+        else:
+            out = out + dx
                 
         out_mean = out.mean()
         out_std = out.std(unbiased=False)
@@ -143,12 +186,16 @@ class BasicBlockWS_LPT(nn.Module):
             out = out
         
         # 양자화
+        
+        
         if not no_relu:
             if self.quant2 is not None:
-                out = self.quant2(out,out_mean, out_std)
+                # plot_tensor_distribution(out)
+                out = self.quant(out)
                 # out = self.quant(out)
         else:
-            if self.quant is not None:
+            if self.quant2 is not None:
+                # plot_tensor_distribution(out)
                 out = self.quant(out)
             
         return out
@@ -278,7 +325,7 @@ class ResNet_WSConv_LPT(nn.Module):
         strides = [stride] + [1]*(num_blocks-1)
         layers = []
         for stride in strides:
-            layers.append(block(self.in_planes, planes, stride, use_bn_layer=use_bn_layer, rho=rho, init_mode=init_mode, quant= self.quant, quant2 = self.quant2))
+            layers.append(block(self.in_planes, planes, stride, use_bn_layer=use_bn_layer, rho=rho, init_mode=init_mode, quant= self.quant, quant2 = self.quant2, quant3 = self.quant3))
             self.in_planes = planes * block.expansion
         return nn.Sequential(*layers)
 
@@ -368,7 +415,8 @@ class ResNet_WS_LPT(ResNet_WSConv_LPT):
             out_std = out0.std(unbiased= False)
             
             out0 = F.relu(out0)
-            
+            # plot_tensor_distribution(out0)
+
             if self.quant2 is not None:
                 out0 = self.quant2(out0, out_mean, out_std)
                 # out0 = self.quant(out0)
@@ -427,6 +475,8 @@ class ResNet_WS_LPT(ResNet_WSConv_LPT):
         else:
             logit = self.fc(out)
 
+        # plot_tensor_distribution(logit)
+        
         if self.quant3 is not None:
             logit = self.quant3(logit)
         
