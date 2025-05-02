@@ -23,3 +23,5 @@ grad_output_logs/
 ./weight_figure4/*
 ./weight_figure5/*/weight_figure/
 /fig/grad/
+weight_figure/
+weight_figure/
