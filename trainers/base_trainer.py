@@ -131,6 +131,7 @@ class Trainer():
                 )
             
             if self.args.quantizer.name == 'WSQG':
+                wt_bit = self.args.quantizer.wt_bit
                 if self.args.quantizer.random_bit == 'fixed_alloc':
                     wt_bit = self.local_wt_bits[task['client_idx']]
                 elif self.args.quantizer.random_bit == 'rand_alloc':
