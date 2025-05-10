@@ -1,4 +1,4 @@
-CUDA_VISIBLE_DEVICES=0
+DEVICE=1
 DATASET=tinyimagenet
 BATCH_SIZE=50
 DECAY=0.995
@@ -6,10 +6,10 @@ if [ ${DATASET} = "tinyimagenet" ];then
     BATCH_SIZE=100
     DECAY=0.998
 fi
-ALPHA=0.3
+ALPHA=0.03
 
-nohup python3 federated_train.py client=ACG server=FedACG exp_name=FedACG_"$ALPHA" \
-dataset=${DATASET} trainer.num_clients=100 split.alpha=${ALPHA} trainer.participation_rate=0.02 \
-batch_size=${BATCH_SIZE} wandb=True trainer.local_lr_decay=${DECAY}  project="FedWS_2_100" & \
+python3 federated_train.py client=ACG server=FedACG visible_devices=\'$DEVICE\' exp_name=FedACG_"$ALPHA" \
+dataset=${DATASET} trainer.num_clients=100 split.alpha=${ALPHA} trainer.participation_rate=0.05 \
+batch_size=${BATCH_SIZE} wandb=True trainer.local_lr_decay=${DECAY}  project="ICCV_REBUTTAL" \
 # split.mode=iid
 
