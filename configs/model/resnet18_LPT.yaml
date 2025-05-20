@@ -8,6 +8,6 @@ last_feature_dim: 512
 rho: 1e-3
 init_mode: "kaiming_uniform"
 
-moving_average: True
+moving_average: False
 mv_alpha: 0.9
 ma_start: 1
