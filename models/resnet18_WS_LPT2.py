@@ -142,7 +142,7 @@ class BasicBlockWS_LPT(nn.Module):
     def forward(self, x: torch.Tensor, no_relu: bool = False) -> torch.Tensor:
         
         # backward unq
-        c_out = self.quant3(x)
+        c_out = self.quant6(x)
         
         out = self.bn1(self.conv1(c_out))
         out_mean = out.mean()
@@ -153,23 +153,29 @@ class BasicBlockWS_LPT(nn.Module):
         # out = F.relu(self.bn1(self.conv1(x)))
         
         # plot_tensor_distribution(out)
-        # relu 후 양자화
-        if self.quant is not None:
-            out = self.quant(out, out_mean, out_std)
-            # out = self.quant(out)
+        # # relu 후 양자화
+        # if self.quant is not None:
+        #     out = self.quant(out, out_mean, out_std)
+            
+        if self.quant4 is not None:
+            out = self.quant4(out)
             
         out = self.bn2(self.conv2(out))
         
         # plot_tensor_distribution(out)
-        if self.quant2 is not None:
-            out = self.quant2(out)
+        # if self.quant2 is not None:
+        #     out = self.quant2(out)
+            
+        if self.quant5 is not None:
+            out = self.quant5(out)
             
         dx = self.downsample(c_out)
         
         if len(self.downsample) != 0:
-            if self.quant2 is not None:
+            if self.quant5 is not None:
+                dx = self.quant5(dx)
                 # plot_tensor_distribution(dx)
-                out = out + self.quant2(dx)
+                out = out + dx
             else:
                 out = out + dx
         else:
@@ -187,14 +193,11 @@ class BasicBlockWS_LPT(nn.Module):
         
         if not no_relu:
             if self.quant is not None:
-                # plot_tensor_distribution(out)
+            #     # plot_tensor_distribution(out)
                 out = self.quant(out, out_mean, out_std)
-                # out = self.quant(out)
-        # else:
-        #     if self.quant is not None:
-        #         # plot_tensor_distribution(out)
-        #         out = self.quant(out, out_mean, out_std)
-            
+            # if self.quant4 is not None:
+            #     out = self.quant4(out)
+                
         return out
 
 
@@ -419,7 +422,9 @@ class ResNet_WS_LPT(ResNet_WSConv_LPT):
 
             if self.quant is not None:
                 out0 = self.quant(out0, out_mean, out_std)
-                # out0 = self.quant(out0)
+                
+            # if self.quant4 is not None:
+            #     out0 = self.quant4(out0)
 
             out = out0
             for i, sublayer in enumerate(self.layer1):
@@ -435,6 +440,9 @@ class ResNet_WS_LPT(ResNet_WSConv_LPT):
             if self.quant is not None:
                 out = self.quant(out, out_mean, out_std)
 
+            # if self.quant4 is not None:
+            #     out = self.quant4(out)
+
             for i, sublayer in enumerate(self.layer2):
                 sub_norelu = (i == len(self.layer2) - 1)
                 out = sublayer(out, no_relu=sub_norelu)
@@ -446,6 +454,9 @@ class ResNet_WS_LPT(ResNet_WSConv_LPT):
             
             if self.quant is not None:
                 out = self.quant(out, out_mean, out_std)
+
+            # if self.quant4 is not None:
+            #     out = self.quant4(out)
 
             for i, sublayer in enumerate(self.layer3):
                 sub_norelu = (i == len(self.layer3) - 1)
@@ -459,6 +470,9 @@ class ResNet_WS_LPT(ResNet_WSConv_LPT):
             if self.quant is not None:
                 out = self.quant(out, out_mean, out_std)
 
+            # if self.quant4 is not None:
+            #     out = self.quant4(out)
+          
             for i, sublayer in enumerate(self.layer4):
                 sub_norelu = (i == len(self.layer4) - 1)
                 out = sublayer(out, no_relu=sub_norelu)
@@ -470,6 +484,9 @@ class ResNet_WS_LPT(ResNet_WSConv_LPT):
             
             if self.quant is not None:
                 out = self.quant(out, out_mean, out_std)
+
+            # if self.quant4 is not None:
+            #     out = self.quant4(out)
             
         else:
             out0 = self.bn1(self.conv1(x))

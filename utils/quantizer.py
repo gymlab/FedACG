@@ -62,7 +62,7 @@ Q_VALUES_TABLE = {
     4: torch.tensor([-2.6536, -1.9735, -1.508, -1.149, -0.8337, -0.5439, -0.2686, 0.,
             0.2686, 0.5439, 0.8337, 1.149, 1.508, 1.9735, 2.6536]),
     6: torch.tensor([ -2.099, -1.836, -1.659, -1.524, -1.411, -1.314, -1.228, -1.15, -1.079, -1.013, -0.95, -0.892, -0.836, -0.783, -0.732, -0.682, -0.635, -0.589, -0.544, -0.5,
-    -0.457, -0.414, -0.373, -0.332, -0.292, -0.252, -0.213, -0.174, -0.135, -0.096,-0.058, -0.019, 0.019, 0.058, 0.096, 0.135, 0.174, 0.213, 0.252, 0.292,
+    -0.457, -0.414, -0.373, -0.332, -0.292, -0.252, -0.213, -0.174, -0.135, -0.096, -0.058, -0.019, 0.019, 0.058, 0.096, 0.135, 0.174, 0.213, 0.252, 0.292,
     0.332, 0.373, 0.414, 0.457, 0.5, 0.544, 0.589, 0.635, 0.682, 0.732, 0.783, 0.836, 0.892, 0.95, 1.013, 1.079, 1.15, 1.228, 1.314, 1.411, 1.524, 
     1.659, 1.836, 2.099]),
     8: torch.tensor([-2.418, -2.154, -1.987, -1.863, -1.762, -1.676, -1.601, -1.534, -1.473, -1.418, -1.366, -1.318, -1.273, -1.23, -1.189, -1.15, -1.113, -1.078, -1.043, -1.01,
@@ -144,9 +144,9 @@ class BlockRounding_ReLU(torch.autograd.Function):
                 # layer_name = self.__class__.__name__
                 # save_grad_output_distribution(grad_output, title= layer_name)
                 # grad_input = DANUQ_quantize(grad_output, self.backward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
-                # grad_input = block_quantize(grad_output, self.backward_bits, self.mode,
-                #                              small_block=self.small_block, block_dim=self.block_dim)
-                grad_input = bucket_quantize_blockwise_mask_zero(grad_output, self.backward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
+                grad_input = block_quantize(grad_output, self.backward_bits, self.mode,
+                                             small_block=self.small_block, block_dim=self.block_dim)
+                # grad_input = bucket_quantize_blockwise_mask_zero(grad_output, self.backward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
                 
             else:
                 # layer_name = self.__class__.__name__
