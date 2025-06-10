@@ -5,8 +5,8 @@ seed: 0
 enable_benchmark: False
 use_amp: True
 multiprocessing: False
-main_gpu: '0'
-visible_devices: '0'
+main_gpu: '3'
+visible_devices: '3'
 num_workers: 0
 pin_memory: True
 refactoring: True
@@ -31,7 +31,7 @@ log_dir: './checkpoints'
 
 #################### Data Split ####################
 split:
-  mode: 'iid'
+  mode: 'dirichlet'
   alpha: 0.3
   class_per_client: 0 # only for skew mode
   unbalanced: False
@@ -58,7 +58,7 @@ defaults:
   - evaler: base
   - dataset: cifar10
   - server: base
-  - model: resnet18
-  - quantizer: base
+  - model: resnet18_WS_LPT2
+  - quantizer: LPT
   # - override hydra/job_logging: colorlog_custom
   # - override hydra/hydra_logging: colorlog

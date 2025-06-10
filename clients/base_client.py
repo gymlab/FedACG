@@ -198,7 +198,7 @@ class Client():
             x, self.args.quantizer.quantization_bits, -1, self.args.quantizer.quant_type, self.args.quantizer.small_block, self.args.quantizer.block_dim, "BFP")
         
             grad_quantizer = lambda x: quantize_block(
-            x, self.args.quantizer.quantization_bits, -1, self.args.quantizer.quant_type, self.args.quantizer.small_block, self.args.quantizer.block_dim, "BFP")
+            x, self.args.quantizer.quantization_bits, -1, self.args.quantizer.quant_type, self.args.quantizer.small_block, self.args.quantizer.block_dim, self.args.quantizer.uniform_mode)
             
             quantizer = {'weight_NUQ' : weight_non_quantizer ,'weight_UQ' : weight_uni_quantizer , 'grad_Q' : grad_quantizer} 
             
@@ -220,23 +220,25 @@ class Client():
                     torch.nn.utils.clip_grad_norm_(self.model.parameters(), 10)
                     
                     # Gradient 양자화
-                    with torch.no_grad():
-                        for name, param in self.model.named_parameters():
+                    if self.args.quantizer.gradient_quantization:
+                        with torch.no_grad():
+                            for name, param in self.model.named_parameters():
 
-                            if param.requires_grad and param.grad is not None:
-                                param.grad.data = grad_Q(param.grad.data).data
+                                if param.requires_grad and param.grad is not None:
+                                    param.grad.data = grad_Q(param.grad.data).data
 
                     
                     self.optimizer.step()
 
                     # 가중치 양자화
-                    with torch.no_grad():
-                        for name, p in self.model.named_parameters():
-                            p.data = weight_NUQ(p.data).data
-                            # if 'conv1.weight' in name or 'conv2.weight' in name or 'fc.weight' in name:
-                            #     p.data = weight_NUQ(p.data).data
-                            # else:
-                            #     p.data = weight_UQ(p.data).data
+                    if self.args.quantizer.weight_quantization:
+                        with torch.no_grad():
+                            for name, p in self.model.named_parameters():
+                                # p.data = weight_NUQ(p.data).data
+                                if 'conv1.weight' in name or 'conv2.weight' in name or 'fc.weight' in name:
+                                    p.data = weight_NUQ(p.data).data
+                                else:
+                                    p.data = weight_UQ(p.data).data
                     
 
 

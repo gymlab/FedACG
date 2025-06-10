@@ -24,16 +24,20 @@ def plot_input_distribution(inp: torch.Tensor, title='Input Distribution'):
     plt.grid(True)
     plt.show()
     
-def plot_tensor_distribution(x, title='Weight Distribution'):
-    import matplotlib.pyplot as plt
+def plot_tensor_distribution(x, title='Weight Distribution', step=None, save_dir='/home/gymlab/projects/FedACG-1/fig/weight_hybrid_t50%'):
+    os.makedirs(save_dir, exist_ok=True)
 
+    timestamp = time.time()
+    prefix = f'step_{step}' if step is not None else f'time_{timestamp:.6f}'
+    
     x_flat = x.detach().cpu().numpy().flatten()
     plt.figure(figsize=(6, 4))
-    plt.hist(x_flat, bins=100, color='skyblue', edgecolor='black')
+    plt.hist(x_flat, bins=200, color='skyblue', edgecolor='black')
     plt.title(title)
     plt.xlabel('Value')
     plt.ylabel('Frequency')
     plt.grid(True)
+    plt.savefig(os.path.join(save_dir, f'{prefix}_{title}.png'))
     plt.show()
     
 def save_grad_output_distribution(grad_output, step=None, save_dir='grad_output_logs', title = None):
@@ -61,10 +65,68 @@ Q_VALUES_TABLE = {
     # 3: torch.tensor([-1.224, 0, 0.7646, 1.7242]   ),
     4: torch.tensor([-2.6536, -1.9735, -1.508, -1.149, -0.8337, -0.5439, -0.2686, 0.,
             0.2686, 0.5439, 0.8337, 1.149, 1.508, 1.9735, 2.6536]),
-    6: torch.tensor([ -2.099, -1.836, -1.659, -1.524, -1.411, -1.314, -1.228, -1.15, -1.079, -1.013, -0.95, -0.892, -0.836, -0.783, -0.732, -0.682, -0.635, -0.589, -0.544, -0.5,
-    -0.457, -0.414, -0.373, -0.332, -0.292, -0.252, -0.213, -0.174, -0.135, -0.096, -0.058, -0.019, 0.019, 0.058, 0.096, 0.135, 0.174, 0.213, 0.252, 0.292,
-    0.332, 0.373, 0.414, 0.457, 0.5, 0.544, 0.589, 0.635, 0.682, 0.732, 0.783, 0.836, 0.892, 0.95, 1.013, 1.079, 1.15, 1.228, 1.314, 1.411, 1.524, 
-    1.659, 1.836, 2.099]),
+    # 6: torch.tensor([ -2.099, -1.836, -1.659, -1.524, -1.411, -1.314, -1.228, -1.15, -1.079, -1.013, -0.95, -0.892, -0.836, -0.783, -0.732, -0.682, -0.635, -0.589, -0.544, -0.5,
+    # -0.457, -0.414, -0.373, -0.332, -0.292, -0.252, -0.213, -0.174, -0.135, -0.096, -0.058, -0.019, 0.019, 0.058, 0.096, 0.135, 0.174, 0.213, 0.252, 0.292,
+    # 0.332, 0.373, 0.414, 0.457, 0.5, 0.544, 0.589, 0.635, 0.682, 0.732, 0.783, 0.836, 0.892, 0.95, 1.013, 1.079, 1.15, 1.228, 1.314, 1.411, 1.524, 
+    # 1.659, 1.836, 2.099]),
+    
+    # 6: torch.tensor([-2.154, -1.863, -1.676, -1.534, -1.418, -1.318, -1.23, -1.15, -1.078, -1.01,
+    # -0.947, -0.887, -0.831, -0.776, -0.725, -0.674, -0.626, -0.579, -0.533, -0.489,
+    # -0.445, -0.402, -0.36, -0.319, -0.278, -0.237, -0.197, -0.157, -0.118, -0.078,
+    # -0.039, 0, 0.038, 0.076, 0.114, 0.153, 0.191, 0.23, 0.269,
+    # 0.309, 0.349, 0.389, 0.431, 0.473, 0.516, 0.56, 0.605, 0.651, 0.699,
+    # 0.748, 0.799, 0.852, 0.908, 0.967, 1.03, 1.097, 1.169, 1.248, 1.335,
+    # 1.434, 1.55, 1.691, 1.876, 2.166]),
+    
+    # 6: torch.tensor([-1.534, -1.418, -1.318, -1.23, -1.15, -1.078, -1.01,
+    # -0.947, -0.887, -0.831, -0.776, -0.725, -0.674, -0.626, -0.579, -0.533, -0.489,
+    # -0.445, -0.402, -0.36, -0.319, -0.278, -0.237, -0.197, -0.157, -0.118, -0.078,
+    # -0.039, 0, 0.038, 0.076, 0.114, 0.153, 0.191, 0.23, 0.269,
+    # 0.309, 0.349, 0.389, 0.431, 0.473, 0.516, 0.56, 0.605, 0.651, 0.699,
+    # 0.748, 0.799, 0.852, 0.908, 0.967, 1.03, 1.097, 1.169, 1.248, 1.335,
+    # 1.434, 1.55]),
+    
+#     # 10% -> 양쪽 3개씩 제외한 58개 levels
+    # 6 : torch.tensor([-1.3200, -1.2400, -1.1700, -1.1000, -1.0300, -0.9800, -0.9200, -0.8700,
+    #     -0.8100, -0.7700, -0.7200, -0.6700, -0.6300, -0.5900, -0.5400, -0.5000,
+    #     -0.4600, -0.4200, -0.3800, -0.3500, -0.3100, -0.2700, -0.2300, -0.2000,
+    #     -0.1600, -0.1300, -0.0900, -0.0500, -0.0200,  0.0200,  0.0500,  0.0900,
+    #      0.1300,  0.1600,  0.2000,  0.2300,  0.2700,  0.3100,  0.3500,  0.3800,
+    #      0.4200,  0.4600,  0.5000,  0.5400,  0.5900,  0.6300,  0.6700,  0.7200,
+    #      0.7700,  0.8100,  0.8700,  0.9200,  0.9800,  1.0300,  1.1000,  1.1700,
+    #      1.2400,  1.3200]),
+    
+    # 20% -> 양쪽 6개씩 제외한 52개 levels
+    # 6: torch.tensor([-1.3200, -1.2300, -1.1500, -1.0700, -1.0100, -0.9400, -0.8800, -0.8200,
+    #     -0.7700, -0.7200, -0.6700, -0.6200, -0.5700, -0.5200, -0.4800, -0.4300,
+    #     -0.3900, -0.3500, -0.3000, -0.2600, -0.2200, -0.1800, -0.1400, -0.1000,
+    #     -0.0600, -0.0200,  0.0200,  0.0600,  0.1000,  0.1400,  0.1800,  0.2200,
+    #      0.2600,  0.3000,  0.3500,  0.3900,  0.4300,  0.4800,  0.5200,  0.5700,
+    #      0.6200,  0.6700,  0.7200,  0.7700,  0.8200,  0.8800,  0.9400,  1.0100,
+    #      1.0700,  1.1500,  1.2300,  1.3200]),
+    
+    # 30% -> 양쪽 9개씩 제외한 46개 levels
+    6: torch.tensor([-1.3200, -1.2200, -1.1300, -1.0500, -0.9700, -0.9000, -0.8400, -0.7700,
+        -0.7100, -0.6600, -0.6000, -0.5500, -0.5000, -0.4400, -0.4000, -0.3500,
+        -0.3000, -0.2500, -0.2100, -0.1600, -0.1100, -0.0700, -0.0200,  0.0200,
+         0.0700,  0.1100,  0.1600,  0.2100,  0.2500,  0.3000,  0.3500,  0.4000,
+         0.4400,  0.5000,  0.5500,  0.6000,  0.6600,  0.7100,  0.7700,  0.8400,
+         0.9000,  0.9700,  1.0500,  1.1300,  1.2200,  1.3200]),
+    
+    # 40% -> 양쪽 12개씩 제외한 40개 levels
+    # 6: torch.tensor([-1.3200, -1.2000, -1.1000, -1.0100, -0.9300, -0.8500, -0.7800, -0.7100,
+    #     -0.6400, -0.5800, -0.5200, -0.4600, -0.4000, -0.3500, -0.2900, -0.2400,
+    #     -0.1800, -0.1300, -0.0800, -0.0300,  0.0300,  0.0800,  0.1300,  0.1800,
+    #      0.2400,  0.2900,  0.3500,  0.4000,  0.4600,  0.5200,  0.5800,  0.6400,
+    #      0.7100,  0.7800,  0.8500,  0.9300,  1.0100,  1.1000,  1.2000,  1.3200]),
+    
+    # 50% -> 양쪽 15개씩 제외한 34개 levels
+    # 6 : torch.tensor([-1.3200, -1.1800, -1.0700, -0.9600, -0.8700, -0.7800, -0.7000, -0.6300,
+    #     -0.5500, -0.4800, -0.4100, -0.3500, -0.2800, -0.2200, -0.1600, -0.0900,
+    #     -0.0300,  0.0300,  0.0900,  0.1600,  0.2200,  0.2800,  0.3500,  0.4100,
+    #      0.4800,  0.5500,  0.6300,  0.7000,  0.7800,  0.8700,  0.9600,  1.0700,
+    #      1.1800,  1.3200]),
+    
     8: torch.tensor([-2.418, -2.154, -1.987, -1.863, -1.762, -1.676, -1.601, -1.534, -1.473, -1.418, -1.366, -1.318, -1.273, -1.23, -1.189, -1.15, -1.113, -1.078, -1.043, -1.01,
                      -0.978, -0.947, -0.917, -0.887, -0.858, -0.831, -0.803, -0.776, -0.75, -0.725, -0.699, -0.674, -0.65, -0.626, -0.602, -0.579, -0.556, -0.533, -0.511, -0.489,
                      -0.467, -0.445, -0.424, -0.402, -0.381, -0.36, -0.339, -0.319, -0.298, -0.278, -0.257, -0.237, -0.217, -0.197, -0.177, -0.157, -0.138, -0.118, -0.098, -0.078,
@@ -85,7 +147,9 @@ class BlockRounding(torch.autograd.Function):
         
         
         if self.quant_flag == "DANUQ":
-            return bucket_quantize_blockwise_mask_zero(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
+            # return bucket_quantize_blockwise_mask_zero(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
+            # return DANUQ_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
+            return hybrid_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
         elif self.quant_flag == "BFP":
             return block_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
         
@@ -144,9 +208,13 @@ class BlockRounding_ReLU(torch.autograd.Function):
                 # layer_name = self.__class__.__name__
                 # save_grad_output_distribution(grad_output, title= layer_name)
                 # grad_input = DANUQ_quantize(grad_output, self.backward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
-                grad_input = block_quantize(grad_output, self.backward_bits, self.mode,
-                                             small_block=self.small_block, block_dim=self.block_dim)
+                # grad_input = block_quantize(grad_output, self.backward_bits, self.mode,
+                #                              small_block=self.small_block, block_dim=self.block_dim)
                 # grad_input = bucket_quantize_blockwise_mask_zero(grad_output, self.backward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
+                if self.quant_flag == "DANUQ":
+                    grad_input = bucket_quantize_blockwise_mask_zero(grad_output, self.backward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
+                elif self.quant_flag == "BFP":
+                    grad_input = block_quantize(grad_output, self.backward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)     
                 
             else:
                 # layer_name = self.__class__.__name__
@@ -209,6 +277,7 @@ def block_quantize(data, bits, mode, ebit=8, small_block="FC", block_dim="B"):
             print(f'there is inf in data: {torch.isinf(data).any()}')
             print(f'there is nan in data: {torch.isnan(data).any()}')
             raise
+        
     else:
         if block_dim == "B":    # Better
             max_entry = torch.max(torch.abs(data.view(data.size(0), -1)), 1)[0]
@@ -459,6 +528,188 @@ def bucket_quantize_blockwise_mask_zero(x, bits, mode, ebit=8, small_block="FC",
     return x_q
 
 
+def quantile_tail_quantize(x_n: torch.Tensor, mask: torch.Tensor, n_bins: int = 3):
+    x_sel = x_n[mask]
+
+    q = torch.linspace(0, 1, n_bins+1, device=x_sel.device)
+
+    q_vals = torch.quantile(x_sel, q)
+    edges = q_vals[1:-1]
+    
+    centroids = 0.5 * (q_vals[1:] + q_vals[:-1])  # n_bins-1개 중심값
+    
+    indices = torch.bucketize(x_sel, edges, right=False)
+    x_sel_quantized = centroids[indices]
+
+    return x_sel_quantized
+
+
+def bfp_tail_quantize(x_tail: torch.Tensor,
+                      bits: int,
+                      mode: str,
+                      ebit: int,
+                      block_dim: str = "B"):
+
+    return block_quantize(x_tail, bits, mode,
+                          ebit=ebit,
+                          small_block="None",  
+                          block_dim=block_dim)
+
+
+def hybrid_quantize(x: torch.Tensor,
+                   bits: int,
+                   mode: str,
+                   ebit: int = 8,
+                   small_block: str = "FC",
+                   block_dim: str = "B") -> torch.Tensor:
+    
+    # plot_tensor_distribution(x, title="input")
+    device = x.device
+    lut = Q_VALUES_TABLE[bits].to(device)           
+    lut_sorted, _ = torch.sort(lut)
+    lut_edges = 0.5 * (lut_sorted[1:] + lut_sorted[:-1]) 
+
+    q_min = lut_sorted[0].item()
+    q_max = lut_sorted[-1].item()
+
+    # tail_step = (lut_sorted[-1] - lut_sorted[-2]).item()   # 마지막 두 값 간격
+
+    tail_levels = 9                                        # 한쪽 3 레벨
+
+    dim_threshold = {"Conv": 2, "FC": 1, "None": 4}.get(small_block, 1)
+
+    def quantize_block(inp: torch.Tensor):
+        x_mean  = inp.mean()
+        std  = torch.clamp(inp.std(unbiased=False), min=1e-10)
+        out = torch.zeros_like(inp)
+
+        x_n = (inp - x_mean) / std                 
+
+        # 마스크
+        mid_mask  = (x_n >= q_min) & (x_n <= q_max)
+        low_mask  = x_n <  q_min
+        high_mask = x_n >  q_max
+        
+        x_min = x_n.min().item()
+        x_max = x_n.max().item()
+        
+        epsilon = 1e-5
+        low_range  = (min(x_min, q_min - epsilon), q_min)
+        high_range = (q_max, max(x_max, q_max + epsilon))
+        
+        
+        # def make_tail_centers(rmin, rmax, levels=3):
+        #     delta = (rmax - rmin) / levels
+        #     return torch.tensor(
+        #         [rmin + (i + 0.5) * delta for i in range(levels)],
+        #         device=inp.device
+        #     )
+
+        # low_centers  = make_tail_centers(*low_range)
+        # high_centers = make_tail_centers(*high_range)
+
+        if mid_mask.any():
+            x_mid = x_n[mid_mask]
+            # plot_tensor_distribution(x_mid, title="x_mid")
+            idx = torch.bucketize(x_mid, lut_edges, right=False)
+            
+            if mode != "stochastic":
+                nxt = torch.clamp(idx + 1, max=lut.numel() - 1)
+                lo, up = lut[idx], lut[nxt]
+                dl, du = (x_mid - lo).abs(), (up - x_mid).abs()
+                p_up = dl / (dl + du + 1e-10)
+                pick = torch.rand_like(p_up) < p_up
+                out[mid_mask] = torch.where(pick, up, lo)
+                # plot_tensor_distribution(out[mid_mask], title="x_mid_quant") 
+            else:
+                out[mid_mask] = lut[idx]
+                # plot_tensor_distribution(out[mid_mask], title="x_mid_quant") 
+
+        if low_mask.any():
+            x_low = x_n[low_mask]
+            # plot_tensor_distribution(x_low, title="x_low")
+            
+            x_low_min = x_low.min()
+            x_low_max = x_low.max()
+            
+            low_edges = torch.linspace(x_low_min, x_low_max, tail_levels+1, device=x_low.device)
+            
+            low_idx = torch.bucketize(x_low, low_edges, right=False) - 1
+            low_idx = torch.clamp(low_idx, 0, tail_levels - 1)
+            low_bin_centers = 0.5 * (low_edges[:-1] + low_edges[1:])
+            x_low_quantized = low_bin_centers[low_idx]
+            out[low_mask] = x_low_quantized
+            # plot_tensor_distribution(out[low_mask], title="x_low_quant") 
+            
+        if high_mask.any():
+            x_high = x_n[high_mask]
+            # plot_tensor_distribution(x_high, title="x_high")
+            
+            x_high_min = x_high.min()
+            x_high_max = x_high.max()
+            
+            high_edges = torch.linspace(x_high_min, x_high_max, tail_levels+1, device=x_high.device)
+            
+            high_idx = torch.bucketize(x_high, high_edges, right=False) - 1
+            high_idx = torch.clamp(high_idx, 0, tail_levels - 1)
+            high_bin_centers = 0.5 * (high_edges[:-1] + high_edges[1:])
+            x_high_quantized = high_bin_centers[high_idx]
+            out[high_mask] = x_high_quantized
+            # plot_tensor_distribution(out[high_mask], title="x_high_quant") 
+                    
+        # # BFP Tail 양자화                    
+        # if low_mask.any():
+        #     # x_low = x_n[low_mask]
+        #     # plot_tensor_distribution(x_low, title="x_low")
+        #     # idx = torch.clamp(((q_min - x_low) / tail_step).floor(),
+        #     #                   0, tail_levels - 1).long()
+        #     # out_low = q_min - (idx + 0.5) * tail_step   
+        #     # out[low_mask] = out_low
+        #     # plot_tensor_distribution(out[low_mask], title="x_low_quant") 
+            
+        #     # BFP Tail 양자화
+        #     # out_low = bfp_tail_quantize(x_n[low_mask], bits, mode, ebit)
+        #     # out[low_mask] = out_low
+            
+        #     x_low = x_n[low_mask].clamp(min=low_range[0], max=low_range[1] - 1e-6)
+        #     idx = ((x_low - low_range[0]) / (low_range[1] - low_range[0]) * tail_levels).floor().clamp(0, tail_levels - 1).long()
+        #     out_low = low_centers[idx]
+        #     out[low_mask] = out_low
+
+        #     # quantile tail 양자화
+        #     # out[low_mask] = quantile_tail_quantize(x_n, low_mask, n_bins=3)
+            
+        # if high_mask.any():
+        #     # x_high = x_n[high_mask]
+        #     # plot_tensor_distribution(x_high, title="x_high")
+        #     # idx = torch.clamp(((x_high - q_max) / tail_step).floor(),
+        #     #                   0, tail_levels - 1).long()
+        #     # out_high = q_max + (idx + 0.5) * tail_step
+        #     # out[high_mask] = out_high
+        #     # plot_tensor_distribution(out[high_mask], title="x_high_quant") 
+
+        #     # out_high = bfp_tail_quantize(x_n[high_mask], bits, mode, ebit)
+        #     # out[high_mask] = out_high
+            
+        #     x_high = x_n[high_mask].clamp(min=high_range[0] + 1e-6, max=high_range[1])
+        #     idx = ((x_high - high_range[0]) / (high_range[1] - high_range[0]) * tail_levels).floor().clamp(0, tail_levels - 1).long()
+        #     out_high = high_centers[idx]
+        #     out[high_mask] = out_high
+            
+        #     # quantile tail 양자화
+        #     # out[high_mask] = quantile_tail_quantize(x_n, high_mask, n_bins=3)
+
+        # plot_tensor_distribution(out, title="out")
+        
+        result = out * std + x_mean
+        # plot_tensor_distribution(result, title="out_scale")
+        return result
+
+    if x.dim() <= dim_threshold:
+        return quantize_block(x)
+    else:
+        return x
+    
 def add_r_(data):
     r = torch.rand_like(data)
     data.add_(r)

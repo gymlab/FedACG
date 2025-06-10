@@ -34,37 +34,73 @@ def build_encoder(args):
     
     # Activation 양자화
     if args.quantizer.LPT_name == 'LPT':
-        
-        # Q1
-        quant_model1 = lambda: BlockQuantizer_ReLU(args.quantizer.quantization_bits, args.quantizer.quantization_bits, args.quantizer.quant_type,
-                                             args.quantizer.small_block, args.quantizer.block_dim)
-        
-        # Q2
-        quant_model2 = lambda: BlockQuantizer(args.quantizer.quantization_bits, -1, args.quantizer.quant_type,
-                                             args.quantizer.small_block, args.quantizer.block_dim, 'DANUQ')
-        
-        # Q3
-        quant_model3 = lambda: BlockQuantizer(-1, args.quantizer.quantization_bits, args.quantizer.quant_type,
-                                             args.quantizer.small_block, args.quantizer.block_dim, 'DANUQ')
-        
-        # U1
-        quant_model4 = lambda: BlockQuantizer(args.quantizer.quantization_bits, args.quantizer.quantization_bits, args.quantizer.quant_type,
-                                             args.quantizer.small_block, args.quantizer.block_dim, "BFP")
-        
-        # U2
-        quant_model5 = lambda: BlockQuantizer(args.quantizer.quantization_bits, -1, args.quantizer.quant_type,
-                                             args.quantizer.small_block, args.quantizer.block_dim, "BFP")
-        
-        # U3
-        quant_model6 = lambda: BlockQuantizer(-1, args.quantizer.quantization_bits, args.quantizer.quant_type,
-                                             args.quantizer.small_block, args.quantizer.block_dim, "BFP")
+        if args.quantizer.activation_quantization:
+            
+            # Q0 (bw: uni)
+            quant_model0 = lambda: BlockQuantizer_ReLU(args.quantizer.quantization_bits, args.quantizer.quantization_bits, args.quantizer.quant_type,
+                                                args.quantizer.small_block, args.quantizer.block_dim, "BFP")
+            
+            # Q1
+            quant_model1 = lambda: BlockQuantizer_ReLU(args.quantizer.quantization_bits, args.quantizer.quantization_bits, args.quantizer.quant_type,
+                                                args.quantizer.small_block, args.quantizer.block_dim, 'DANUQ')
+            
+            # Q2
+            quant_model2 = lambda: BlockQuantizer(args.quantizer.quantization_bits, -1, args.quantizer.quant_type,
+                                                args.quantizer.small_block, args.quantizer.block_dim, 'DANUQ')
+            
+            # Q3
+            quant_model3 = lambda: BlockQuantizer(-1, args.quantizer.quantization_bits, args.quantizer.quant_type,
+                                                args.quantizer.small_block, args.quantizer.block_dim, 'DANUQ')
+            
+            # U1
+            quant_model4 = lambda: BlockQuantizer(args.quantizer.quantization_bits, args.quantizer.quantization_bits, args.quantizer.quant_type,
+                                                args.quantizer.small_block, args.quantizer.block_dim, "BFP")
+            
+            # U2
+            quant_model5 = lambda: BlockQuantizer(args.quantizer.quantization_bits, -1, args.quantizer.quant_type,
+                                                args.quantizer.small_block, args.quantizer.block_dim, "BFP")
+            
+            # U3
+            quant_model6 = lambda: BlockQuantizer(-1, args.quantizer.quantization_bits, args.quantizer.quant_type,
+                                                args.quantizer.small_block, args.quantizer.block_dim, "BFP")
+            
+        else:
+            quant_model0 = lambda: BlockQuantizer_ReLU(-1, -1, args.quantizer.quant_type,
+                                                args.quantizer.small_block, args.quantizer.block_dim, "BFP")
+            # Q1
+            quant_model1 = lambda: BlockQuantizer_ReLU(-1, -1, args.quantizer.quant_type,
+                                                args.quantizer.small_block, args.quantizer.block_dim)
+            
+            # Q2
+            quant_model2 = lambda: BlockQuantizer(-1, -1, args.quantizer.quant_type,
+                                                args.quantizer.small_block, args.quantizer.block_dim, 'DANUQ')
+    
+            # Q3
+            quant_model3 = lambda: BlockQuantizer(-1, -1, args.quantizer.quant_type,
+                                                args.quantizer.small_block, args.quantizer.block_dim, 'DANUQ')
+            
+            # U1
+            quant_model4 = lambda: BlockQuantizer(-1, -1, args.quantizer.quant_type,
+                                                args.quantizer.small_block, args.quantizer.block_dim, "BFP")
+            
+            # U2
+            quant_model5 = lambda: BlockQuantizer(-1, -1, args.quantizer.quant_type,
+                                                args.quantizer.small_block, args.quantizer.block_dim, "BFP")
+            
+            # U3
+            quant_model6 = lambda: BlockQuantizer(-1, -1, args.quantizer.quant_type,
+                                                args.quantizer.small_block, args.quantizer.block_dim, "BFP")
 
+        NUQ_0 = quant_model0()
         NUQ_1 = quant_model1()
         NUQ_2 = quant_model2()
         NUQ_3 = quant_model3()
         UQ_1 = quant_model4()
         UQ_2 = quant_model5()
         UQ_3 = quant_model6()
+       
+        server_model0 = lambda: BlockQuantizer_ReLU(-1 , -1, args.quantizer.quant_type,
+                                             args.quantizer.small_block, args.quantizer.block_dim)
        
         server_model1 = lambda: BlockQuantizer_ReLU(-1 , -1, args.quantizer.quant_type,
                                              args.quantizer.small_block, args.quantizer.block_dim)
@@ -84,7 +120,8 @@ def build_encoder(args):
         server_model6 = lambda: BlockQuantizer(-1 , -1, args.quantizer.quant_type,
                                              args.quantizer.small_block, args.quantizer.block_dim)
          
-        server_quant_function = server_model1()
+        server_quant_function0 = server_model0()
+        server_quant_function1 = server_model1()
         server_quant_function2 = server_model2()
         server_quant_function3 = server_model3()
         server_quant_function4 = server_model4()
@@ -99,8 +136,8 @@ def build_encoder(args):
     
     
     if args.quantizer.LPT_name == 'LPT':
-        encoder = ENCODER_REGISTRY.get(args.model.name)(args, num_classes, quant = NUQ_1, quant2 = NUQ_2, quant3 = NUQ_3, quant4 = UQ_1, quant5 = UQ_2, quant6 = UQ_3, **args.model) if len(args.model.name) > 0 else None
-        eval_encoder= ENCODER_REGISTRY.get(args.model.name)(args, num_classes, quant = server_quant_function, quant2 = server_quant_function2, quant3 = server_quant_function3,
+        encoder = ENCODER_REGISTRY.get(args.model.name)(args, num_classes, quant0 = NUQ_0, quant = NUQ_1, quant2 = NUQ_2, quant3 = NUQ_3, quant4 = UQ_1, quant5 = UQ_2, quant6 = UQ_3, **args.model) if len(args.model.name) > 0 else None
+        eval_encoder= ENCODER_REGISTRY.get(args.model.name)(args, num_classes, quant0=server_quant_function0, quant = server_quant_function1, quant2 = server_quant_function2, quant3 = server_quant_function3,
                                                             quant4 = server_quant_function4, quant5 = server_quant_function5, quant6 = server_quant_function6, **args.model) if len(args.model.name) > 0 else None
     else:
         encoder = ENCODER_REGISTRY.get(args.model.name)(args, num_classes, **args.model) if len(args.model.name) > 0 else None
