@@ -6,13 +6,13 @@ This repository is the official implementation of *[ICCV 2025](https://iccv.thec
 
 By [Seung-Wook Kim](https://www.linkedin.com/in/%EC%8A%B9%EC%9A%B1-%EA%B9%80-003a7310a/), [Seong-yeol Kim](https://github.com/Seongyeol-kim), [Ji-ah Kim](https://github.com/Kim-Jiah), [Seowon Ji](https://www.linkedin.com/in/seowon-ji-7587741a9/) and [Se-Ho Lee](https://dblp.org/pid/158/9405.html)
 
+
+<img src="tiny_result.png" alt="teaser" width="1000"/>
+
 > Federated learning (FL) often suffers from performance degradation due to key challenges such as data heterogeneity and communication constraints.
 To address these limitations, we present a novel FL framework called FedWSQ, which integrates weight standardization~(WS) and the proposed distribution-aware non-uniform quantization~(DANUQ).
 WS enhances FL performance by filtering out biased components in local updates during training, thereby improving the robustness of the model against data heterogeneity and unstable client participation. In addition, DANUQ minimizes quantization errors by leveraging the statistical properties of local model updates. As a result, FedWSQ significantly reduces communication overhead while maintaining superior model accuracy.
 Extensive experiments on FL benchmark datasets demonstrate that FedWSQ consistently outperforms existing FL methods across various challenging FL settings, including extreme data heterogeneity and ultra-low-bit communication scenarios. 
-
-<!-- <img src="imagenet_result.png" alt="teaser" width="1000"/> -->
-
 
 ## Installation
 ### ⚙ Dependencies
