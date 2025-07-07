@@ -1,10 +1,10 @@
-DATASET=cifar100
+DATASET=cifar10
 BATCH_SIZE=10
 if [ ${DATASET} = "tinyimagenet" ];then
     BATCH_SIZE=20
 fi 
 ALPHA=0.3
-NBITS=4
+NBITS=1
 DEVICE=0
 
 python3 federated_train.py client=base server=base visible_devices=\'$DEVICE\' exp_name=FedAvgWSQG_NC500_"$ALPHA"_"B$NBITS" \

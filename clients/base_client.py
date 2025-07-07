@@ -9,6 +9,7 @@ import gc
 
 from utils import *
 from utils.metrics import evaluate
+from utils.data import CutMix
 from models import build_encoder
 from typing import Callable, Dict, Tuple, Union, List
 from utils.logging_utils import AverageMeter
@@ -50,6 +51,13 @@ class Client():
             train_sampler = RandomClasswiseSampler(local_dataset, num_instances=self.args.dataset.num_instances)   
         else:
             train_sampler = None
+        
+        if self.args.dataset.cutmix.use == True:
+            local_dataset = CutMix(local_dataset, 
+                                   num_classes=len(local_dataset.dataset.classes), 
+                                   num_mix=self.args.dataset.cutmix.num_mix,
+                                   beta=self.args.dataset.cutmix.beta,
+                                   prob=self.args.dataset.cutmix.prob)
 
         self.loader =  DataLoader(local_dataset, batch_size=self.args.batch_size, sampler=train_sampler, shuffle=train_sampler is None,
                                    num_workers=self.args.num_workers, pin_memory=self.args.pin_memory)

@@ -1,5 +1,6 @@
 import torch
 from torchvision import datasets, transforms
+import random
 import os
 from datasets.cifar import cifar_noniid, cifar_dirichlet_balanced,cifar_dirichlet_unbalanced, cifar_iid, cifar_overlap, cifar_toyset
 import torch.nn as nn
@@ -121,9 +122,6 @@ class DatasetSplitSubset(DatasetSplit):
         return weights
 
 
-
-
-
 class DatasetSplitMultiView(torch.utils.data.Dataset):
     """An abstract Dataset class wrapped around Pytorch Dataset class.
     """
@@ -233,3 +231,71 @@ class GaussianBlur(object):
 
         self.pil_to_tensor = transforms.ToTensor()
         self.tensor_to_pil = transforms.ToPILImage()
+
+
+class CutMix(DatasetSplitSubset):
+    def __init__(self, dataset, num_classes, num_mix=2, beta=1., prob=1.0):
+        self.dataset = dataset.dataset
+        self.subset_classes = dataset.subset_classes
+
+        self.class_dict = dataset.class_dict
+        self.indices = dataset.indices
+
+        self.total_classes = num_classes
+        self.num_mix = num_mix
+        self.beta = beta
+        self.prob = prob
+        
+    def __getitem__(self, item):
+        img, label = self.dataset[self.indices[item]]
+        label_onehot = self.onehot(label)
+
+        for _ in range(self.num_mix):
+            r = np.random.rand(1)
+            if self.beta <= 0 or r > self.prob:
+                continue
+
+            # generate mixed sample
+            lamda = np.random.beta(self.beta, self.beta)
+            rand_item = random.choice(range(len(self.indices)))
+
+            img2, label2 = self.dataset[self.indices[rand_item]]
+            label2_onehot = self.onehot(label2)
+
+            bbx1, bby1, bbx2, bby2 = self.rand_bbox(img.size(), lamda)
+            img[:, bbx1:bbx2, bby1:bby2] = img2[:, bbx1:bbx2, bby1:bby2]
+            lamda = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (img.size()[-1] * img.size()[-2]))
+            label_onehot = label_onehot * lamda + label2_onehot * (1. - lamda)
+
+        return img, label_onehot
+
+    def onehot(self, target):
+        vec = torch.zeros(self.total_classes, dtype=torch.float32)
+        vec[target] = 1.
+        return vec
+    
+    @staticmethod
+    def rand_bbox(size, lam):
+        if len(size) == 4:
+            W = size[2]
+            H = size[3]
+        elif len(size) == 3:
+            W = size[1]
+            H = size[2]
+        else:
+            raise Exception
+
+        cut_rat = np.sqrt(1. - lam)
+        cut_w = int(W * cut_rat)
+        cut_h = int(H * cut_rat)
+
+        # uniform
+        cx = np.random.randint(W)
+        cy = np.random.randint(H)
+
+        bbx1 = np.clip(cx - cut_w // 2, 0, W)
+        bby1 = np.clip(cy - cut_h // 2, 0, H)
+        bbx2 = np.clip(cx + cut_w // 2, 0, W)
+        bby2 = np.clip(cy + cut_h // 2, 0, H)
+
+        return bbx1, bby1, bbx2, bby2

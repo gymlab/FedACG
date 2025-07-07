@@ -14,7 +14,6 @@ def pil_loader(path):
         with Image.open(f) as img:
             return img.convert('RGB')
 
-
 def accimage_loader(path):
     import torchvision.datasets.accimage as accimage
     try:
