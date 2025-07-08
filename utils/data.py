@@ -234,7 +234,7 @@ class GaussianBlur(object):
 
 
 class CutMix(DatasetSplitSubset):
-    def __init__(self, dataset, num_classes, num_mix=2, beta=1., prob=1.0):
+    def __init__(self, dataset, num_classes, num_mix=2, beta=1., prob=1.0, use_cutmix_reg=False):
         self.dataset = dataset.dataset
         self.subset_classes = dataset.subset_classes
 
@@ -246,6 +246,17 @@ class CutMix(DatasetSplitSubset):
         self.beta = beta
         self.prob = prob
         
+        self.use_cutmix_reg = use_cutmix_reg
+        if use_cutmix_reg == True:
+            self.probs = self.compute_sampling_probs()
+        
+    def compute_sampling_probs(self):
+        label_list = [self.dataset[idx][-1] for idx in self.indices]
+        class_counts = torch.tensor([self.class_dict[str(label)] for label in label_list])
+        weights = 1. / (class_counts + 1e-6)
+        probs = weights / weights.sum()
+        return probs
+    
     def __getitem__(self, item):
         img, label = self.dataset[self.indices[item]]
         label_onehot = self.onehot(label)
@@ -257,7 +268,10 @@ class CutMix(DatasetSplitSubset):
 
             # generate mixed sample
             lamda = np.random.beta(self.beta, self.beta)
-            rand_item = random.choice(range(len(self.indices)))
+            if self.use_cutmix_reg == True:
+                rand_item = torch.multinomial(self.probs, 1).item()
+            else:
+                rand_item = random.choice(range(len(self.indices)))
 
             img2, label2 = self.dataset[self.indices[rand_item]]
             label2_onehot = self.onehot(label2)
@@ -299,3 +313,56 @@ class CutMix(DatasetSplitSubset):
         bby2 = np.clip(cy + cut_h // 2, 0, H)
 
         return bbx1, bby1, bbx2, bby2
+    
+    
+class Mixup(DatasetSplitSubset):
+    def __init__(self, dataset, num_classes, num_mix=2, beta=1., use_cutmix_reg=False):
+        self.dataset = dataset.dataset
+        self.subset_classes = dataset.subset_classes
+
+        self.class_dict = dataset.class_dict
+        self.indices = dataset.indices
+
+        self.total_classes = num_classes
+        self.num_mix = num_mix
+        self.beta = beta
+        
+        self.use_cutmix_reg = use_cutmix_reg
+        if use_cutmix_reg == True:
+            self.probs = self.compute_sampling_probs()
+        
+    def compute_sampling_probs(self):
+        label_list = [self.dataset[idx][-1] for idx in self.indices]
+        class_counts = torch.tensor([self.class_dict[str(label)] for label in label_list])
+        weights = 1. / (class_counts + 1e-6)
+        probs = weights / weights.sum()
+        return probs
+    
+    def __getitem__(self, item):
+        img, label = self.dataset[self.indices[item]]
+        label_onehot = self.onehot(label)
+
+        for _ in range(self.num_mix):
+            r = np.random.rand(1)
+            if self.beta <= 0 or r > self.prob:
+                continue
+
+            # generate mixed sample
+            lamda = np.random.beta(self.beta, self.beta)
+            if self.use_cutmix_reg == True:
+                rand_item = torch.multinomial(self.probs, 1).item()
+            else:
+                rand_item = random.choice(range(len(self.indices)))
+
+            img2, label2 = self.dataset[self.indices[rand_item]]
+            label2_onehot = self.onehot(label2)
+
+            img = img * lamda + img2 * (1. - lamda)
+            label_onehot = label_onehot * lamda + label2_onehot * (1. - lamda)
+
+        return img, label_onehot
+
+    def onehot(self, target):
+        vec = torch.zeros(self.total_classes, dtype=torch.float32)
+        vec[target] = 1.
+        return vec

@@ -57,7 +57,8 @@ class Client():
                                    num_classes=len(local_dataset.dataset.classes), 
                                    num_mix=self.args.dataset.cutmix.num_mix,
                                    beta=self.args.dataset.cutmix.beta,
-                                   prob=self.args.dataset.cutmix.prob)
+                                   prob=self.args.dataset.cutmix.prob,
+                                   use_cutmix_reg=self.args.dataset.cutmix.cutmix_reg)
 
         self.loader =  DataLoader(local_dataset, batch_size=self.args.batch_size, sampler=train_sampler, shuffle=train_sampler is None,
                                    num_workers=self.args.num_workers, pin_memory=self.args.pin_memory)
@@ -66,7 +67,7 @@ class Client():
                                    weight_decay=self.args.optimizer.wd)
         self.scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer=self.optimizer, 
                                                      lr_lambda=lambda epoch: self.args.trainer.local_lr_decay ** epoch)
-    
+
         self.trainer = trainer
         self.num_layers = self.model.num_layers
         self.class_counts = np.sort([*local_dataset.class_dict.values()])[::-1]
