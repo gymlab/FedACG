@@ -38,38 +38,38 @@ def build_encoder(args):
             
             # Q0 (bw: uni)
             quant_model0 = lambda: BlockQuantizer_ReLU(args.quantizer.quantization_bits, args.quantizer.quantization_bits, args.quantizer.quant_type,
-                                                args.quantizer.small_block, args.quantizer.block_dim, "BFP")
-            
+                                                args.quantizer.small_block, args.quantizer.block_dim, args.quantizer.act_uniform_mode, args.quantizer.lut_mode, args.quantizer.comp)
+
             # Q1
             quant_model1 = lambda: BlockQuantizer_ReLU(args.quantizer.quantization_bits, args.quantizer.quantization_bits, args.quantizer.quant_type,
-                                                args.quantizer.small_block, args.quantizer.block_dim, 'DANUQ')
+                                                args.quantizer.small_block, args.quantizer.block_dim, args.quantizer.act_uniform_mode, args.quantizer.lut_mode, args.quantizer.comp)
             
             # Q2
             quant_model2 = lambda: BlockQuantizer(args.quantizer.quantization_bits, -1, args.quantizer.quant_type,
-                                                args.quantizer.small_block, args.quantizer.block_dim, 'DANUQ')
+                                                args.quantizer.small_block, args.quantizer.block_dim, args.quantizer.act_uniform_mode, args.quantizer.lut_mode, args.quantizer.comp)
             
             # Q3
             quant_model3 = lambda: BlockQuantizer(-1, args.quantizer.quantization_bits, args.quantizer.quant_type,
-                                                args.quantizer.small_block, args.quantizer.block_dim, 'DANUQ')
+                                                args.quantizer.small_block, args.quantizer.block_dim, args.quantizer.act_uniform_mode, args.quantizer.lut_mode, args.quantizer.comp)
             
             # U1
             quant_model4 = lambda: BlockQuantizer(args.quantizer.quantization_bits, args.quantizer.quantization_bits, args.quantizer.quant_type,
-                                                args.quantizer.small_block, args.quantizer.block_dim, "BFP")
+                                                args.quantizer.small_block, args.quantizer.block_dim, args.quantizer.act_uniform_mode, args.quantizer.lut_mode, args.quantizer.comp)
             
             # U2
             quant_model5 = lambda: BlockQuantizer(args.quantizer.quantization_bits, -1, args.quantizer.quant_type,
-                                                args.quantizer.small_block, args.quantizer.block_dim, "BFP")
+                                                args.quantizer.small_block, args.quantizer.block_dim, args.quantizer.act_uniform_mode, args.quantizer.lut_mode, args.quantizer.comp)
             
             # U3
             quant_model6 = lambda: BlockQuantizer(-1, args.quantizer.quantization_bits, args.quantizer.quant_type,
-                                                args.quantizer.small_block, args.quantizer.block_dim, "BFP")
+                                                args.quantizer.small_block, args.quantizer.block_dim, args.quantizer.act_uniform_mode, args.quantizer.lut_mode, args.quantizer.comp)
             
         else:
             quant_model0 = lambda: BlockQuantizer_ReLU(-1, -1, args.quantizer.quant_type,
                                                 args.quantizer.small_block, args.quantizer.block_dim, "BFP")
             # Q1
             quant_model1 = lambda: BlockQuantizer_ReLU(-1, -1, args.quantizer.quant_type,
-                                                args.quantizer.small_block, args.quantizer.block_dim)
+                                                args.quantizer.small_block, args.quantizer.block_dim, 'DANUQ')
             
             # Q2
             quant_model2 = lambda: BlockQuantizer(-1, -1, args.quantizer.quant_type,

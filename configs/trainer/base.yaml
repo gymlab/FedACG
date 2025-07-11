@@ -10,3 +10,4 @@ global_lr: 1.0
 global_rounds: 1000
 uplink_quantizer: ""
 downlink_quantizer: ""
+lr_fix: False

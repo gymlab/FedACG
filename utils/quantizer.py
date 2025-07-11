@@ -70,13 +70,13 @@ Q_VALUES_TABLE = {
     # 0.332, 0.373, 0.414, 0.457, 0.5, 0.544, 0.589, 0.635, 0.682, 0.732, 0.783, 0.836, 0.892, 0.95, 1.013, 1.079, 1.15, 1.228, 1.314, 1.411, 1.524, 
     # 1.659, 1.836, 2.099]),
     
-    # 6: torch.tensor([-2.154, -1.863, -1.676, -1.534, -1.418, -1.318, -1.23, -1.15, -1.078, -1.01,
-    # -0.947, -0.887, -0.831, -0.776, -0.725, -0.674, -0.626, -0.579, -0.533, -0.489,
-    # -0.445, -0.402, -0.36, -0.319, -0.278, -0.237, -0.197, -0.157, -0.118, -0.078,
-    # -0.039, 0, 0.038, 0.076, 0.114, 0.153, 0.191, 0.23, 0.269,
-    # 0.309, 0.349, 0.389, 0.431, 0.473, 0.516, 0.56, 0.605, 0.651, 0.699,
-    # 0.748, 0.799, 0.852, 0.908, 0.967, 1.03, 1.097, 1.169, 1.248, 1.335,
-    # 1.434, 1.55, 1.691, 1.876, 2.166]),
+    6: torch.tensor([-2.154, -1.863, -1.676, -1.534, -1.418, -1.318, -1.23, -1.15, -1.078, -1.01,
+    -0.947, -0.887, -0.831, -0.776, -0.725, -0.674, -0.626, -0.579, -0.533, -0.489,
+    -0.445, -0.402, -0.36, -0.319, -0.278, -0.237, -0.197, -0.157, -0.118, -0.078,
+    -0.039, 0, 0.038, 0.076, 0.114, 0.153, 0.191, 0.23, 0.269,
+    0.309, 0.349, 0.389, 0.431, 0.473, 0.516, 0.56, 0.605, 0.651, 0.699,
+    0.748, 0.799, 0.852, 0.908, 0.967, 1.03, 1.097, 1.169, 1.248, 1.335,
+    1.434, 1.55, 1.691, 1.876, 2.166]),
     
     # 6: torch.tensor([-1.534, -1.418, -1.318, -1.23, -1.15, -1.078, -1.01,
     # -0.947, -0.887, -0.831, -0.776, -0.725, -0.674, -0.626, -0.579, -0.533, -0.489,
@@ -96,7 +96,7 @@ Q_VALUES_TABLE = {
     #      0.7700,  0.8100,  0.8700,  0.9200,  0.9800,  1.0300,  1.1000,  1.1700,
     #      1.2400,  1.3200]),
     
-    # 20% -> 양쪽 6개씩 제외한 52개 levels
+    # # 20% -> 양쪽 6개씩 제외한 52개 levels
     # 6: torch.tensor([-1.3200, -1.2300, -1.1500, -1.0700, -1.0100, -0.9400, -0.8800, -0.8200,
     #     -0.7700, -0.7200, -0.6700, -0.6200, -0.5700, -0.5200, -0.4800, -0.4300,
     #     -0.3900, -0.3500, -0.3000, -0.2600, -0.2200, -0.1800, -0.1400, -0.1000,
@@ -106,12 +106,12 @@ Q_VALUES_TABLE = {
     #      1.0700,  1.1500,  1.2300,  1.3200]),
     
     # 30% -> 양쪽 9개씩 제외한 46개 levels
-    6: torch.tensor([-1.3200, -1.2200, -1.1300, -1.0500, -0.9700, -0.9000, -0.8400, -0.7700,
-        -0.7100, -0.6600, -0.6000, -0.5500, -0.5000, -0.4400, -0.4000, -0.3500,
-        -0.3000, -0.2500, -0.2100, -0.1600, -0.1100, -0.0700, -0.0200,  0.0200,
-         0.0700,  0.1100,  0.1600,  0.2100,  0.2500,  0.3000,  0.3500,  0.4000,
-         0.4400,  0.5000,  0.5500,  0.6000,  0.6600,  0.7100,  0.7700,  0.8400,
-         0.9000,  0.9700,  1.0500,  1.1300,  1.2200,  1.3200]),
+    # 6: torch.tensor([-1.3200, -1.2200, -1.1300, -1.0500, -0.9700, -0.9000, -0.8400, -0.7700,
+    #     -0.7100, -0.6600, -0.6000, -0.5500, -0.5000, -0.4400, -0.4000, -0.3500,
+    #     -0.3000, -0.2500, -0.2100, -0.1600, -0.1100, -0.0700, -0.0200,  0.0200,
+    #      0.0700,  0.1100,  0.1600,  0.2100,  0.2500,  0.3000,  0.3500,  0.4000,
+    #      0.4400,  0.5000,  0.5500,  0.6000,  0.6600,  0.7100,  0.7700,  0.8400,
+    #      0.9000,  0.9700,  1.0500,  1.1300,  1.2200,  1.3200]),
     
     # 40% -> 양쪽 12개씩 제외한 40개 levels
     # 6: torch.tensor([-1.3200, -1.2000, -1.1000, -1.0100, -0.9300, -0.8500, -0.7800, -0.7100,
@@ -127,6 +127,7 @@ Q_VALUES_TABLE = {
     #      0.4800,  0.5500,  0.6300,  0.7000,  0.7800,  0.8700,  0.9600,  1.0700,
     #      1.1800,  1.3200]),
     
+
     8: torch.tensor([-2.418, -2.154, -1.987, -1.863, -1.762, -1.676, -1.601, -1.534, -1.473, -1.418, -1.366, -1.318, -1.273, -1.23, -1.189, -1.15, -1.113, -1.078, -1.043, -1.01,
                      -0.978, -0.947, -0.917, -0.887, -0.858, -0.831, -0.803, -0.776, -0.75, -0.725, -0.699, -0.674, -0.65, -0.626, -0.602, -0.579, -0.556, -0.533, -0.511, -0.489,
                      -0.467, -0.445, -0.424, -0.402, -0.381, -0.36, -0.339, -0.319, -0.298, -0.278, -0.257, -0.237, -0.217, -0.197, -0.177, -0.157, -0.138, -0.118, -0.098, -0.078,
@@ -134,97 +135,283 @@ Q_VALUES_TABLE = {
                      0.396, 0.417, 0.438, 0.459, 0.481, 0.502, 0.524, 0.547, 0.569, 0.592, 0.615, 0.639, 0.662, 0.687, 0.711, 0.736, 0.762, 0.788, 0.814, 0.842, 0.869, 0.898, 0.927,
                      0.957, 0.988, 1.02, 1.053, 1.087, 1.123, 1.16, 1.198, 1.239, 1.282, 1.327, 1.375, 1.426, 1.482, 1.542, 1.609, 1.683, 1.769, 1.87, 1.994, 2.16, 2.423])
 }
-class BlockRounding(torch.autograd.Function):
-    @staticmethod
-    def forward(self, x, forward_bits, backward_bits, mode, small_block="None", block_dim="B", quant_flag = "DANUQ"):
-        self.backward_bits = backward_bits
-        self.mode = mode
-        self.quant_flag = quant_flag
-        self.small_block = small_block
-        self.block_dim = block_dim
-        if forward_bits == -1: return x
-        
-        
-        
-        if self.quant_flag == "DANUQ":
-            # return bucket_quantize_blockwise_mask_zero(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
-            # return DANUQ_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
-            return hybrid_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
-        elif self.quant_flag == "BFP":
-            return block_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
-        
+
+LUT = {
     
-    @staticmethod
-    def backward(self, grad_output):
-        
-        if self.needs_input_grad[0]:
-            if self.backward_bits != -1:
-                # layer_name = self.__class__.__name__
-                # save_grad_output_distribution(grad_output, title= layer_name)
-                
-                # grad_input = block_quantize(grad_output, self.backward_bits, self.mode,
-                #                              small_block=self.small_block, block_dim=self.block_dim)
-                if self.quant_flag == "BFP":
-                    grad_input = block_quantize(grad_output, self.backward_bits, self.mode,
-                                             small_block=self.small_block, block_dim=self.block_dim)
+    'E3M2' : torch.tensor([-28.0000, -24.0000, -20.0000, -16.0000, -14.0000, -12.0000, -10.0000,
+         -8.0000,  -7.0000,  -6.0000,  -5.0000,  -4.0000,  -3.5000,  -3.0000,
+         -2.5000,  -2.0000,  -1.7500,  -1.5000,  -1.2500,  -1.0000,  -0.8750,
+         -0.7500,  -0.6250,  -0.5000,  -0.4375,  -0.3750,  -0.3125,  -0.2500,
+         -0.2188,  -0.1875,  -0.1562,   0.0000,   0.1562,   0.1875,   0.2188,
+          0.2500,   0.3125,   0.3750,   0.4375,   0.5000,   0.6250,   0.7500,
+          0.8750,   1.0000,   1.2500,   1.5000,   1.7500,   2.0000,   2.5000,
+          3.0000,   3.5000,   4.0000,   5.0000,   6.0000,   7.0000,   8.0000,
+          10.0000,  12.0000,  14.0000,  16.0000,  20.0000,  24.0000,  28.0000]),
+
+    'E2M3' : torch.tensor([-7.5000, -7.0000, -6.5000, -6.0000, -5.5000, -5.0000, -4.5000,
+            -4.0000, -3.7500, -3.5000, -3.2500, -3.0000, -2.7500, -2.5000, -2.2500,
+        -2.0000, -1.8750, -1.7500, -1.6250, -1.5000, -1.3750, -1.2500, -1.1250,
+        -1.0000, -0.9375, -0.8750, -0.8125, -0.7500, -0.6875, -0.6250, -0.5625,
+        0.0000,  0.5625,  0.6250,  0.6875,  0.7500,  0.8125,  0.8750,  0.9375,
+        1.0000,  1.1250,  1.2500,  1.3750,  1.5000,  1.6250,  1.7500,  1.8750,
+        2.0000,  2.2500,  2.5000,  2.7500,  3.0000,  3.2500,  3.5000,  3.7500,
+        4.0000,  4.5000,  5.0000,  5.5000,  6.0000,  6.5000,  7.0000,  7.5000]),
+
+    'E1M4' : torch.tensor([-3.8750, -3.7500, -3.6250, -3.5000, -3.3750, -3.2500, -3.1250,
+                -3.0000, -2.8750, -2.7500, -2.6250, -2.5000, -2.3750, -2.2500, -2.1250,
+                -2.0000, -1.9375, -1.8750, -1.8125, -1.7500, -1.6875, -1.6250, -1.5625,
+                -1.5000, -1.4375, -1.3750, -1.3125, -1.2500, -1.1875, -1.1250, -1.0000,
+            0.0000,  1.0000,  1.1250,  1.1875,  1.2500,  1.3125,  1.3750,  1.4375,
+            1.5000,  1.5625,  1.6250,  1.6875,  1.7500,  1.8125,  1.8750,  1.9375,
+            2.0000,  2.1250,  2.2500,  2.3750,  2.5000,  2.6250,  2.7500,  2.8750,
+            3.0000,  3.1250,  3.2500,  3.3750,  3.5000,  3.6250,  3.7500,  3.8750]),
     
-                else:
-                    grad_input = bucket_quantize_blockwise_mask_zero(grad_output, self.backward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
-                
-                # if self.quant_flag == "BFP":
-                #     grad_input = block_quantize(grad_output, self.backward_bits, self.mode,
-                #                              small_block=self.small_block, block_dim=self.block_dim)
-                    
-                # elif self.quant_flag == "DANUQ":
-                #     grad_input = DANUQ_quantize(grad_output, self.backward_bits, self.mode,
-                #                             small_block=self.small_block, block_dim=self.block_dim)
-                
-            else:
-                # layer_name = self.__class__.__name__
-                grad_input = grad_output
-        return grad_input, None, None, None, None, None, None
+    'E3M1' : torch.tensor([-24.0000, -16.0000, -12.0000,  -8.0000,  -6.0000,  -4.0000,  -3.0000,
+         -2.0000,  -1.5000,  -1.0000,  -0.7500,  -0.5000,  -0.3750,  -0.2500,
+         -0.1250,   0.0000,   0.1250,   0.2500,   0.3750,   0.5000,
+          0.7500,   1.0000,   1.5000,   2.0000,   3.0000,   4.0000,   6.0000,
+          8.0000,  12.0000,  16.0000,  24.0000]),
+    
+    'E2M2' : torch.tensor([-7.0000, -6.0000, -5.0000, -4.0000, -3.5000, -3.0000, -2.5000, -2.0000,
+        -1.7500, -1.5000, -1.2500, -1.0000, -0.8750, -0.6250, -0.5000,   0.0000,
+         0.5000,  0.6250,  0.8750,  1.0000,  1.2500,  1.5000,  1.7500,
+         2.0000,  2.5000,  3.0000,  3.5000,  4.0000,  5.0000,  6.0000,  7.0000]),
+
+    'E1M3' : torch.tensor([-3.7500, -3.5000, -3.2500, -3.0000, -2.7500, -2.5000, -2.2500, -2.0000,
+        -1.8750, -1.6250, -1.5000, -1.3750, -1.2500, -1.1250, -1.0000,  0.0000,
+         1.0000,  1.1250,  1.2500,  1.3750,  1.5000,  1.6250,  1.8750,
+         2.0000,  2.2500,  2.5000,  2.7500,  3.0000,  3.2500,  3.5000,  3.7500]),
+    
+    'E1M2' : torch.tensor([-3.5000, -3.0000, -2.5000, -2.0000, -1.5000, -1.0000, -0.5000,
+         0.0000, 0.5000, 1.0000, 1.5000, 2.0000,  2.5000,  3.0000,  3.5000]),
+
+    'E2M1' : torch.tensor([-6.0000, -4.0000, -3.0000, -2.0000, -1.5000, -1.0000, -0.5000,
+          0.0000, 0.5000,  0.7500,  1.0000,  1.5000,  2.0000,  3.0000,  4.0000,  6.0000]),
+    
+    'E3M0' : torch.tensor([-16.0000,  -8.0000,  -4.0000,  -2.0000,  -1.0000,  -0.5000,  -0.2500,
+         0.0000,  0.2500,   0.5000,   1.0000,   2.0000,   4.0000,  8.0000,  16.0000])
+    
     
 
+}
+
+class BlockRounding(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, x, forward_bits, backward_bits, mode,
+                small_block="None", block_dim="B", quant_flag = "DANUQ", lut_mode="E3M2", comp=False, k=5.0):
+        ctx.backward_bits = backward_bits
+        ctx.mode = mode
+        ctx.quant_flag = quant_flag
+        ctx.small_block = small_block
+        ctx.block_dim = block_dim
+        # DGE용
+        ctx.k = k
+        ctx.lut_mode = lut_mode
+        ctx.comp = comp
+        if lut_mode not in LUT:
+            raise ValueError(f"Unsupported quantization format: {lut_mode}")
+        lut = LUT[lut_mode]
+        max_lut = torch.max(torch.abs(lut))
+        ctx.delta = max_lut.item() / (2 ** forward_bits - 1)
+        ctx.save_for_backward(x)
+        if forward_bits == -1:
+            return x
+        if ctx.quant_flag == "DANUQ":
+            return DANUQ_quantize(x, forward_bits, ctx.mode, small_block=ctx.small_block, block_dim=ctx.block_dim)
+        elif ctx.quant_flag == "BFP":
+            return block_quantize(x, forward_bits, ctx.mode, small_block=ctx.small_block, block_dim=ctx.block_dim)
+        elif ctx.quant_flag == "occ":
+            return occ(x, forward_bits, ctx.mode, small_block=ctx.small_block, block_dim=ctx.block_dim, lut_mode=ctx.lut_mode, comp=ctx.comp)
+    @staticmethod
+    def backward(ctx, grad_output):
+        x, = ctx.saved_tensors
+        if ctx.needs_input_grad[0]:
+            if ctx.backward_bits != -1:
+                if ctx.quant_flag == "DANUQ":
+                    grad_input = block_quantize(grad_output, ctx.backward_bits, ctx.mode,
+                                    small_block=ctx.small_block, block_dim=ctx.block_dim)
+                elif ctx.quant_flag == "BFP":
+                    grad_input = block_quantize(grad_output, ctx.backward_bits, ctx.mode,
+                                    small_block=ctx.small_block, block_dim=ctx.block_dim)
+                elif ctx.quant_flag == "occ":
+                    grad_input = occ(grad_output, ctx.backward_bits, ctx.mode,
+                                    small_block=ctx.small_block, block_dim=ctx.block_dim, lut_mode=ctx.lut_mode, comp=ctx.comp)
+                # DGE gradient
+                # delta = ctx.delta
+                # k = ctx.k
+                # x_scaled = x
+                # grad_est = (1 / k) * torch.pow(torch.abs(x_scaled - delta / 2) + 1e-6, (1 / k - 1))
+                # grad_est = torch.clamp(grad_est, max=3.0)
+                # grad_input = grad_output * grad_est
+            else:
+                grad_input = grad_output
+        return grad_input, None, None, None, None, None, None, None, None
+    
 class BlockRounding_ReLU(torch.autograd.Function):
     @staticmethod
-    def forward(self, x, forward_bits, backward_bits, mode, mean, std, small_block="None", block_dim="B", quant_flag = "DANUQ"):
-        self.backward_bits = backward_bits
-        self.mode = mode
-        self.mean = mean
-        self.std = std
-        self.small_block = small_block
-        self.block_dim = block_dim
-        if forward_bits == -1: return x
+    def forward(ctx, x, forward_bits, backward_bits, mode, mean, std,
+                small_block="None", block_dim="B", quant_flag="DANUQ",
+                lut_mode="E3M2", comp=False, k=5.0):
+        ctx.backward_bits = backward_bits
+        ctx.mode = mode
+        ctx.mean = mean
+        ctx.std = std
+        ctx.small_block = small_block
+        ctx.block_dim = block_dim
+        ctx.quant_flag = quant_flag
+        ctx.k = k
+        ctx.lut_mode = lut_mode
+        ctx.comp = comp
+        if lut_mode not in LUT:
+            raise ValueError(f"Unsupported quantization format: {lut_mode}")
+        lut = LUT[lut_mode]
+        max_lut = torch.max(torch.abs(lut))
+        ctx.delta = max_lut.item() / (2 ** forward_bits - 1)
+        ctx.save_for_backward(x)
+        if forward_bits == -1:
+            return x
+        # return DANUQ_ReLU_quantize(x, forward_bits, mode, mean, std, small_block=small_block, block_dim=block_dim)
+        if ctx.quant_flag == "DANUQ":
+            return DANUQ_quantize(x, forward_bits, ctx.mode, small_block=ctx.small_block, block_dim=ctx.block_dim)
+        elif ctx.quant_flag == "BFP":
+            return block_quantize(x, forward_bits, ctx.mode, small_block=ctx.small_block, block_dim=ctx.block_dim)
+        elif ctx.quant_flag == "occ":
+            return occ(x, forward_bits, ctx.mode, small_block=ctx.small_block, block_dim=ctx.block_dim, lut_mode=ctx.lut_mode, comp=ctx.comp)
+    @staticmethod
+    def backward(ctx, grad_output):
+        x, = ctx.saved_tensors
+        if ctx.needs_input_grad[0]:
+            if ctx.backward_bits != -1:
+                if ctx.quant_flag == "DANUQ":
+                    grad_input = block_quantize(grad_output, ctx.backward_bits, ctx.mode,
+                                    small_block=ctx.small_block, block_dim=ctx.block_dim)
+                elif ctx.quant_flag == "BFP":
+                    grad_input = block_quantize(grad_output, ctx.backward_bits, ctx.mode,
+                                    small_block=ctx.small_block, block_dim=ctx.block_dim)
+                elif ctx.quant_flag == "occ":
+                    grad_input = occ(grad_output, ctx.backward_bits, ctx.mode,
+                                    small_block=ctx.small_block, block_dim=ctx.block_dim, lut_mode=ctx.lut_mode, comp=ctx.comp)
+                ### DGE gradient
+                # delta = ctx.delta
+                # k = ctx.k
+                # # DGE gradient estimation
+                # grad_est = (1 / k) * torch.pow(torch.abs(x - delta / 2) + 1e-6, (1 / k - 1))
+                # grad_est = torch.clamp(grad_est, max=3.0)
+                # grad_input = grad_output * grad_est
+            else:
+                grad_input = grad_output
+        return grad_input, None, None, None, None, None, None, None, None, None, None
+
+
+
+
+
+# class BlockRounding(torch.autograd.Function):
+#     @staticmethod
+#     def forward(self, x, forward_bits, backward_bits, mode, small_block="None", block_dim="B", quant_flag = "DANUQ"):
+#         self.backward_bits = backward_bits
+#         self.mode = mode
+#         self.quant_flag = quant_flag
+#         self.small_block = small_block
+#         self.block_dim = block_dim
+#         if forward_bits == -1: return x
         
-        self.quant_flag = quant_flag
+#         return occ(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
         
-        return DANUQ_ReLU_quantize(x, forward_bits, self.mode, self.mean, self.std, small_block=self.small_block, block_dim=self.block_dim)
+#         # if self.quant_flag == "DANUQ":
+#         #     # return bucket_quantize_blockwise_mask_zero(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
+#         #     # return DANUQ_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
+#         #     return hybrid_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
+            
+#         # elif self.quant_flag == "BFP":
+#         #     return block_quantize(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
         
     
-    @staticmethod
-    def backward(self, grad_output):
-        if self.needs_input_grad[0]:
-            if self.backward_bits != -1:
-                # layer_name = self.__class__.__name__
-                # save_grad_output_distribution(grad_output, title= layer_name)
-                # grad_input = DANUQ_quantize(grad_output, self.backward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
-                # grad_input = block_quantize(grad_output, self.backward_bits, self.mode,
-                #                              small_block=self.small_block, block_dim=self.block_dim)
-                # grad_input = bucket_quantize_blockwise_mask_zero(grad_output, self.backward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
-                if self.quant_flag == "DANUQ":
-                    grad_input = bucket_quantize_blockwise_mask_zero(grad_output, self.backward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
-                elif self.quant_flag == "BFP":
-                    grad_input = block_quantize(grad_output, self.backward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)     
+#     @staticmethod
+#     def backward(self, grad_output):
+        
+#         if self.needs_input_grad[0]:
+#             if self.backward_bits != -1:
+#                 # layer_name = self.__class__.__name__
+#                 # save_grad_output_distribution(grad_output, title= layer_name)
                 
-            else:
-                # layer_name = self.__class__.__name__
-                grad_input = grad_output
+#                 # DGE gradient estimation
+#                 delta = self.delta
+#                 k = self.k
+#                 x_scaled = x  # if x was already scaled before occ, you may need to save x_scaled directly
+#                 grad_est = (1 / k) * torch.pow(torch.abs(x_scaled - delta / 2) + 1e-6, (1 / k - 1))
+#                 grad_input = grad_output * grad_est
                 
-        return grad_input, None, None, None, None, None, None, None, None
+#                 # grad_input = block_quantize(grad_output, self.backward_bits, self.mode,
+#                 #                              small_block=self.small_block, block_dim=self.block_dim)
+                
+#                 # if self.quant_flag == "BFP":
+#                 #     grad_input = block_quantize(grad_output, self.backward_bits, self.mode,
+#                 #                              small_block=self.small_block, block_dim=self.block_dim)
+    
+#                 # else:
+#                 #     # return hybrid_quantize(grad_output, self.backward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
+        
+#                 #     grad_input = bucket_quantize_blockwise_mask_zero(grad_output, self.backward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
+                
+#                 # if self.quant_flag == "BFP":
+#                 #     grad_input = block_quantize(grad_output, self.backward_bits, self.mode,
+#                 #                              small_block=self.small_block, block_dim=self.block_dim)
+                    
+#                 # elif self.quant_flag == "DANUQ":
+#                 #     grad_input = DANUQ_quantize(grad_output, self.backward_bits, self.mode,
+#                 #                             small_block=self.small_block, block_dim=self.block_dim)
+                
+#             else:
+#                 # layer_name = self.__class__.__name__
+#                 grad_input = grad_output
+                
+#         return grad_input, None, None, None, None, None, None
+   
+
+# class BlockRounding_ReLU(torch.autograd.Function):
+#     @staticmethod
+#     def forward(self, x, forward_bits, backward_bits, mode, mean, std, small_block="None", block_dim="B", quant_flag = "DANUQ"):
+#         self.backward_bits = backward_bits
+#         self.mode = mode
+#         self.mean = mean
+#         self.std = std
+#         self.small_block = small_block
+#         self.block_dim = block_dim
+#         if forward_bits == -1: return x
+        
+#         self.quant_flag = quant_flag
+        
+#         return DANUQ_ReLU_quantize(x, forward_bits, self.mode, self.mean, self.std, small_block=self.small_block, block_dim=self.block_dim)
+        
+#         # return occ(x, forward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
+        
+    
+#     @staticmethod
+#     def backward(self, grad_output):
+#         if self.needs_input_grad[0]:
+#             if self.backward_bits != -1:
+#                 # layer_name = self.__class__.__name__
+#                 # save_grad_output_distribution(grad_output, title= layer_name)
+#                 # grad_input = DANUQ_quantize(grad_output, self.backward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
+#                 grad_input = block_quantize(grad_output, self.backward_bits, self.mode,
+#                                              small_block=self.small_block, block_dim=self.block_dim)
+#                 # grad_input = bucket_quantize_blockwise_mask_zero(grad_output, self.backward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
+                
+#                 # if self.quant_flag == "DANUQ":
+#                 #     grad_input = bucket_quantize_blockwise_mask_zero(grad_output, self.backward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)
+#                 # elif self.quant_flag == "BFP":
+#                 #     grad_input = block_quantize(grad_output, self.backward_bits, self.mode, small_block=self.small_block, block_dim=self.block_dim)     
+                
+#             else:
+#                 # layer_name = self.__class__.__name__
+#                 grad_input = grad_output
+                
+#         return grad_input, None, None, None, None, None, None, None, None
     
 class BlockQuantizer(nn.Module):
     def __init__(self, wl_activate, wl_error, mode,
-            small_block="None", block_dim="B", quant_flag = "BFP"):
+            small_block="None", block_dim="B", quant_flag = "BFP", lut_mode="E3M2", comp=False):
         super(BlockQuantizer, self).__init__()
         self.wl_activate = wl_activate
         self.wl_error = wl_error
@@ -232,14 +419,16 @@ class BlockQuantizer(nn.Module):
         self.small_block="None"
         self.block_dim="B"
         self.quant_flag= quant_flag
+        self.lut_mode = lut_mode
+        self.comp = comp
     def forward(self, x):
         return quantize_block(x, self.wl_activate,
                               self.wl_error, self.mode,
-                              self.small_block, self.block_dim, self.quant_flag)
+                              self.small_block, self.block_dim, self.quant_flag, self.lut_mode, self.comp)
         
 class BlockQuantizer_ReLU(nn.Module):
     def __init__(self, wl_activate, wl_error, mode,
-            small_block="None", block_dim="B", quant_flag = "DANUQ"):
+            small_block="None", block_dim="B", quant_flag = "DANUQ", lut_mode="E3M2", comp=False):
         super(BlockQuantizer_ReLU, self).__init__()
         self.wl_activate = wl_activate
         self.wl_error = wl_error
@@ -247,12 +436,15 @@ class BlockQuantizer_ReLU(nn.Module):
         self.small_block="None"
         self.block_dim="B"
         self.quant_flag= quant_flag
+        self.lut_mode = lut_mode
+        self.comp = comp
     def forward(self, x, mean, std):
         return quantize_block_ReLU(x, self.wl_activate,
                               self.wl_error, self.mode, mean, std,
-                              self.small_block, self.block_dim, self.quant_flag)
+                              self.small_block, self.block_dim, self.quant_flag, self.lut_mode, self.comp)
         
 def block_quantize(data, bits, mode, ebit=8, small_block="FC", block_dim="B"):
+    
     with torch.no_grad():
         data_h = data.clone().clamp(min=1e-10)
         data_l = data.clone().clamp(max=-1e-10)
@@ -574,7 +766,7 @@ def hybrid_quantize(x: torch.Tensor,
 
     # tail_step = (lut_sorted[-1] - lut_sorted[-2]).item()   # 마지막 두 값 간격
 
-    tail_levels = 9                                        # 한쪽 3 레벨
+    tail_levels = 6                                        # 한쪽 3 레벨
 
     dim_threshold = {"Conv": 2, "FC": 1, "None": 4}.get(small_block, 1)
 
@@ -590,12 +782,12 @@ def hybrid_quantize(x: torch.Tensor,
         low_mask  = x_n <  q_min
         high_mask = x_n >  q_max
         
-        x_min = x_n.min().item()
-        x_max = x_n.max().item()
+        # x_min = x_n.min().item()
+        # x_max = x_n.max().item()
         
-        epsilon = 1e-5
-        low_range  = (min(x_min, q_min - epsilon), q_min)
-        high_range = (q_max, max(x_max, q_max + epsilon))
+        # epsilon = 1e-5
+        # low_range  = (min(x_min, q_min - epsilon), q_min)
+        # high_range = (q_max, max(x_max, q_max + epsilon))
         
         
         # def make_tail_centers(rmin, rmax, levels=3):
@@ -675,9 +867,6 @@ def hybrid_quantize(x: torch.Tensor,
         #     idx = ((x_low - low_range[0]) / (low_range[1] - low_range[0]) * tail_levels).floor().clamp(0, tail_levels - 1).long()
         #     out_low = low_centers[idx]
         #     out[low_mask] = out_low
-
-        #     # quantile tail 양자화
-        #     # out[low_mask] = quantile_tail_quantize(x_n, low_mask, n_bins=3)
             
         # if high_mask.any():
         #     # x_high = x_n[high_mask]
@@ -695,11 +884,15 @@ def hybrid_quantize(x: torch.Tensor,
         #     idx = ((x_high - high_range[0]) / (high_range[1] - high_range[0]) * tail_levels).floor().clamp(0, tail_levels - 1).long()
         #     out_high = high_centers[idx]
         #     out[high_mask] = out_high
-            
-        #     # quantile tail 양자화
-        #     # out[high_mask] = quantile_tail_quantize(x_n, high_mask, n_bins=3)
 
         # plot_tensor_distribution(out, title="out")
+
+        #quantile tail 양자화
+        # if low_mask.any():
+        #     out[low_mask] = quantile_tail_quantize(x_n, low_mask, n_bins=tail_levels)
+            
+        # if high_mask.any():
+        #     out[high_mask] = quantile_tail_quantize(x_n, high_mask, n_bins=tail_levels)
         
         result = out * std + x_mean
         # plot_tensor_distribution(result, title="out_scale")
@@ -714,5 +907,48 @@ def add_r_(data):
     r = torch.rand_like(data)
     data.add_(r)
     
+def quantize_to_LUT(x: torch.Tensor, lut: torch.Tensor):
+    
+    lut = torch.sort(lut)[0].to(x.device)
+
+    # midpoints between LUT values to define bins
+    midpoints = (lut[:-1] + lut[1:]) / 2
+
+    # 각 x의 값이 어느 bin에 속하는지를 구함
+    indices = torch.bucketize(x, midpoints)
+
+    return lut[indices]
+   
+def occ(x: torch.Tensor,
+        bits: int,
+        mode: str,
+        ebit: int = 8,
+        small_block: str = "FC",
+        block_dim: str = "B",
+        lut_mode: str = 'E3M2',
+        alpha: float = 0.99,
+        comp: bool = True) -> torch.Tensor:
+
+    values = LUT[lut_mode]
+
+    # absmax scaling
+    scaling_factor = values.abs().max().item() / (x.abs().max().item() + 1e-6)
+    x_scaled = x * scaling_factor
+    
+    # outlier threshold
+    threshold = torch.quantile(x_scaled.abs(), alpha)
+    x_clamped = torch.clamp(x_scaled, -threshold, threshold)
+
+    x_quant = quantize_to_LUT(x_clamped, values)
+
+    # sparse outlier matrix
+    if comp:
+        residual = x_scaled - x_clamped
+        x_dequant = (x_quant + residual) / scaling_factor
+    else:        
+        x_dequant = x_quant / scaling_factor
+    
+    return x_dequant
+
 quantize_block = BlockRounding.apply
 quantize_block_ReLU = BlockRounding_ReLU.apply

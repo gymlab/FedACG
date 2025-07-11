@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 def plot_tensor_distribution(tensor: torch.Tensor, 
                               title: str = "Tensor Distribution", 
-                              bins: int = 100, 
+                              bins: int = 200, 
                               save_path: str = "./tensor_distribution.png",
                               add_timestamp: bool = True):
 
@@ -39,7 +39,7 @@ def plot_tensor_distribution(tensor: torch.Tensor,
     if add_timestamp:
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         base, ext = os.path.splitext(save_path)
-        save_path = f"./weight_figure/{base}_{timestamp}{ext}"
+        save_path = f"./fig/act_figure/{timestamp}_{title}{ext}"
 
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
@@ -151,7 +151,7 @@ class BasicBlockWS_LPT(nn.Module):
 
     def forward(self, x: torch.Tensor, no_relu: bool = False) -> torch.Tensor:
         
-        # c_out = self.quant6(x)
+        # plot_tensor_distribution(x, title="input")
         
         if self.blk_start_uni_quant:
             if self.quant6 is not None:
@@ -159,43 +159,32 @@ class BasicBlockWS_LPT(nn.Module):
         else:
             if self.quant3 is not None:
                 c_out = self.quant3(x)
+                
+        # plot_tensor_distribution(c_out, title="input quant")
         
         out = self.bn1(self.conv1(c_out))
         
-        # out_mean = out.mean()
-        # out_std = out.std(unbiased=False)
-        
-        # out = F.relu(out)
-        
-        # # plot_tensor_distribution(out)
-        
-        # # if self.quant is not None:
-        # #     out = self.quant(out, out_mean, out_std)
-            
-        # if self.quant4 is not None:
-        #     out = self.quant4(out)
+        # plot_tensor_distribution(out, title="conv1")
         
         if self.conv1_uni_quant:
             out = F.relu(out)
+            # plot_tensor_distribution(out, title="conv1 relu")
             if self.quant4 is not None:
                 out = self.quant4(out)
         else:
             out_mean = out.mean()
             out_std = out.std(unbiased= False)
             out = F.relu(out)
+            # plot_tensor_distribution(out, title="conv1 relu")
             if self.quant is not None:
                 out = self.quant(out, out_mean, out_std)
                 
+        # plot_tensor_distribution(out, title="conv1 quant")
+        
         out = self.bn2(self.conv2(out))
-        
-        # plot_tensor_distribution(out)
-        
-        # # if self.quant2 is not None:
-        # #     out = self.quant2(out)
-            
-        # if self.quant5 is not None:
-        #     out = self.quant5(out)
-        
+
+        # plot_tensor_distribution(out, title="conv2")
+
         if self.conv2_uni_quant:
             if self.quant5 is not None:
                 out = self.quant5(out)
@@ -203,66 +192,48 @@ class BasicBlockWS_LPT(nn.Module):
             if self.quant2 is not None:
                 out = self.quant2(out)
                 
+        # plot_tensor_distribution(out, title="conv2 quant")
+        
         dx = self.downsample(c_out)
-        
-        # if len(self.downsample) != 0:
-        #     if self.quant5 is not None:
-        #         dx = self.quant5(dx)
-        #         # plot_tensor_distribution(dx)
-        #         out = out + dx
-        #     else:
-        #         out = out + dx
-        # else:
-        #     out = out + dx
-        
+
+        # plot_tensor_distribution(dx, title="downsample")
+
         if len(self.downsample) != 0:
             if self.downsample_uni_quant:
                 if self.quant5 is not None:
                     dx = self.quant5(dx)
+                    # plot_tensor_distribution(dx, title="downsample quant")
                     out = out + dx
                 else:
                     out = out + dx
             else:
                 if self.quant2 is not None:
                     dx = self.quant2(dx)
+                    # plot_tensor_distribution(dx, title="downsample quant")
                     out = out + dx
                 else:
                     out = out + dx     
         else:
             out = out + dx
             
-        # out_mean = out.mean()
-        # out_std = out.std(unbiased=False)
-        
-        # if not no_relu:
-        #     out = F.relu(out)
-        #     if self.quant is not None:
-        #         out = self.quant(out, out_mean, out_std)
-        
-        # if not no_relu:
-        #     out = F.relu(out)
-        # else:
-        #     out = out
-                
-        # if not no_relu:
-        #     if self.quant is not None:
-        #     #     # plot_tensor_distribution(out)
-        #         out = self.quant(out, out_mean, out_std)
-        #     # if self.quant4 is not None:
-        #     #     out = self.quant4(out)
-        
+        # plot_tensor_distribution(out, title="add")
+                    
         if not no_relu:
             if self.blk_end_uni_quant:
                 out = F.relu(out)
+                # plot_tensor_distribution(out, title="add relu")
                 if self.quant4 is not None:
                     out = self.quant4(out)
             else:
                 out_mean = out.mean()
                 out_std = out.std(unbiased= False)
                 out = F.relu(out)
+                # plot_tensor_distribution(out, title="add relu")
                 if self.quant is not None:
                     out = self.quant(out, out_mean, out_std)
                 
+        # plot_tensor_distribution(out, title="add quant")
+        
         return out
 
 
@@ -580,7 +551,7 @@ class ResNet_WS_LPT(ResNet_WSConv_LPT):
                 out = F.relu(out)
                 if self.quant is not None:
                     out = self.quant(out, out_mean, out_std)
-            
+
             for i, sublayer in enumerate(self.layer4):
                 sub_norelu = (i == len(self.layer4) - 1)
                 out = sublayer(out, no_relu=sub_norelu)

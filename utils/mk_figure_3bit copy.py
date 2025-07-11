@@ -34,7 +34,7 @@ def nonuniform_quantization_3bit(x):
     q[(x >= 3) & (x < 4)]    = 3.5
     q[(x >= 4) & (x < 5.5)]  = 4
     q[(x >= 5.5) & (x < 6)]  = 4.5
-    q[(x >= 6) & (x < 6.5)]  = 5
+    q[(x >= 6) & (x < 6.5)]  = 5r
     q[(x >= 6.5) & (x <= 8)] = 8
     return q
 

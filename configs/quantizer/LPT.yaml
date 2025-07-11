@@ -15,7 +15,14 @@ quant_type: 'stochastic'
 quantization_bits: 6
 small_block: 'None'
 block_dim: 'B'
-uniform_mode: 'DANUQ'
+
+weight_uniform_mode: 'BFP'
+grad_uniform_mode: 'BFP'
+act_uniform_mode: 'occ'
+
 weight_quantization: True
-gradient_quantization: False
-activation_quantization: False
+gradient_quantization: True
+activation_quantization: True
+
+lut_mode: 'E3M2'    # E2M3, E3M2, E1M4
+comp: True

@@ -58,7 +58,7 @@ defaults:
   - evaler: base
   - dataset: cifar10
   - server: base
-  - model: resnet18_WS_LPT2
+  - model: resnet18_LPT
   - quantizer: LPT
   # - override hydra/job_logging: colorlog_custom
   # - override hydra/hydra_logging: colorlog

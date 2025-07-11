@@ -17,3 +17,4 @@ do
     wandb=True model=${MODEL} project="BMVC_2025_3" model.init_mode='kaiming_normal' quantizer.uniform_mode='DANUQ' \
     split.mode=iid
 done
+

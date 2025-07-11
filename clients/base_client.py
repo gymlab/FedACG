@@ -192,16 +192,16 @@ class Client():
         # LPT
         else:
             weight_non_quantizer = lambda x: quantize_block(
-            x, self.args.quantizer.quantization_bits, -1, self.args.quantizer.quant_type, self.args.quantizer.small_block, self.args.quantizer.block_dim, self.args.quantizer.uniform_mode)
-            
+            x, self.args.quantizer.quantization_bits, -1, self.args.quantizer.quant_type, self.args.quantizer.small_block, self.args.quantizer.block_dim, self.args.quantizer.weight_uniform_mode, self.args.quantizer.lut_mode, self.args.quantizer.comp)
+
             weight_uni_quantizer = lambda x: quantize_block(
-            x, self.args.quantizer.quantization_bits, -1, self.args.quantizer.quant_type, self.args.quantizer.small_block, self.args.quantizer.block_dim, "BFP")
-        
+            x, self.args.quantizer.quantization_bits, -1, self.args.quantizer.quant_type, self.args.quantizer.small_block, self.args.quantizer.block_dim, "BFP", self.args.quantizer.lut_mode, self.args.quantizer.comp)
+
             grad_quantizer = lambda x: quantize_block(
-            x, self.args.quantizer.quantization_bits, -1, self.args.quantizer.quant_type, self.args.quantizer.small_block, self.args.quantizer.block_dim, self.args.quantizer.uniform_mode)
-            
-            quantizer = {'weight_NUQ' : weight_non_quantizer ,'weight_UQ' : weight_uni_quantizer , 'grad_Q' : grad_quantizer} 
-            
+            x, self.args.quantizer.quantization_bits, -1, self.args.quantizer.quant_type, self.args.quantizer.small_block, self.args.quantizer.block_dim, self.args.quantizer.grad_uniform_mode, self.args.quantizer.lut_mode, self.args.quantizer.comp)
+
+            quantizer = {'weight_NUQ' : weight_non_quantizer ,'weight_UQ' : weight_uni_quantizer , 'grad_Q' : grad_quantizer}
+
             weight_NUQ = quantizer['weight_NUQ']
             weight_UQ = quantizer['weight_UQ']
             grad_Q = quantizer['grad_Q']

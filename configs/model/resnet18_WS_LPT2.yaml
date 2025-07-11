@@ -12,9 +12,9 @@ moving_average: False
 mv_alpha: 0.9
 ma_start: 1
 
-blk1_uni_quant: False
-blk_start_uni_quant: False
-blk_end_uni_quant: False
-conv1_uni_quant: False
-conv2_uni_quant: False
-downsample_uni_quant: False
+blk1_uni_quant: True
+blk_start_uni_quant: True
+blk_end_uni_quant: True
+conv1_uni_quant: True
+conv2_uni_quant: True
+downsample_uni_quant: True

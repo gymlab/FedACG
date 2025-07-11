@@ -353,16 +353,25 @@ class Trainer():
         return
 
     def lr_update(self, epoch: int) -> None:
-        if self.global_rounds == 1000:
-            exponent = epoch
-        elif self.global_rounds < 1000:
-            exponent = epoch * (1000 // self.global_rounds)
-        else:
-            exponent = epoch // (self.global_rounds // 1000)
         
-        self.lr = self.args.trainer.local_lr * (self.local_lr_decay) ** (exponent)
-        return
-
+        if self.args.trainer.lr_fix:
+            
+            ### lr고정 ####
+            self.lr = self.args.trainer.local_lr
+            return
+            
+        else:
+            
+            if self.global_rounds == 1000:
+                exponent = epoch
+            elif self.global_rounds < 1000:
+                exponent = epoch * (1000 // self.global_rounds)
+            else:
+                exponent = epoch // (self.global_rounds // 1000)
+            
+            self.lr = self.args.trainer.local_lr * (self.local_lr_decay) ** (exponent)
+            return
+        
     def save_model(self, epoch: int = -1, suffix: str = '') -> None:
         
         model_path = self.exp_path / self.args.output_model_path
