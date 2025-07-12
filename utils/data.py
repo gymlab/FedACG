@@ -249,6 +249,13 @@ class CutMix(DatasetSplitSubset):
         self.use_cutmix_reg = use_cutmix_reg
         if use_cutmix_reg == True:
             self.probs = self.compute_sampling_probs()
+            
+    def compute_noise_prob(self):
+        counts = np.array(list(self.class_dict.values()))
+        p_max = 1. - float(len(counts)) / float(self.total_classes)
+        probs = counts / counts.sum()
+        entropy = -np.sum(probs * np.log(probs + 1e-8)) / np.log(len(probs))  # 정규화 엔트로피
+        return p_max * (1.0 - entropy)
         
     def compute_sampling_probs(self):
         label_list = [self.dataset[idx][-1] for idx in self.indices]
