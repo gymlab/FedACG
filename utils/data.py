@@ -249,7 +249,11 @@ class CutMix(DatasetSplitSubset):
         self.use_cutmix_reg = use_cutmix_reg
         if use_cutmix_reg == True:
             self.probs = self.compute_sampling_probs()
-            
+        # updates
+        self.noise_prob = -1.
+        if self.total_classes > len(self.class_dict.keys()):
+            self.noise_prob  = self.compute_noise_prob()
+        
     def compute_noise_prob(self):
         counts = np.array(list(self.class_dict.values()))
         p_max = 1. - float(len(counts)) / float(self.total_classes)
@@ -272,22 +276,27 @@ class CutMix(DatasetSplitSubset):
             r = np.random.rand(1)
             if self.beta <= 0 or r > self.prob:
                 continue
-
             # generate mixed sample
             lamda = np.random.beta(self.beta, self.beta)
-            if self.use_cutmix_reg == True:
-                rand_item = torch.multinomial(self.probs, 1).item()
-            else:
-                rand_item = random.choice(range(len(self.indices)))
-
-            img2, label2 = self.dataset[self.indices[rand_item]]
-            label2_onehot = self.onehot(label2)
-
             bbx1, bby1, bbx2, bby2 = self.rand_bbox(img.size(), lamda)
-            img[:, bbx1:bbx2, bby1:bby2] = img2[:, bbx1:bbx2, bby1:bby2]
             lamda = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (img.size()[-1] * img.size()[-2]))
-            label_onehot = label_onehot * lamda + label2_onehot * (1. - lamda)
+            
+            if self.noise_prob > 0. and np.random.rand() < self.noise_prob:
+                # generate noise
+                img2 = torch.randn_like(img)
+                label_onehot = label_onehot * lamda
+            else:
+                if self.use_cutmix_reg == True:
+                    rand_item = torch.multinomial(self.probs, 1).item()
+                else:
+                    rand_item = random.choice(range(len(self.indices)))
 
+                img2, label2 = self.dataset[self.indices[rand_item]]
+                label2_onehot = self.onehot(label2)
+                label_onehot = label_onehot * lamda + label2_onehot * (1. - lamda)
+
+            img[:, bbx1:bbx2, bby1:bby2] = img2[:, bbx1:bbx2, bby1:bby2]
+            
         return img, label_onehot
 
     def onehot(self, target):
