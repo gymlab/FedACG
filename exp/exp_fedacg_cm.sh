@@ -1,5 +1,5 @@
-DEVICE=0
-DATASET=tinyimagenet
+DEVICE=1
+DATASET=cifar100
 BATCH_SIZE=50
 DECAY=0.995
 if [ ${DATASET} = "tinyimagenet" ];then

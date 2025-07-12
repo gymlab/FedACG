@@ -251,8 +251,8 @@ class CutMix(DatasetSplitSubset):
             self.probs = self.compute_sampling_probs()
         # updates
         self.noise_prob = -1.
-        if self.total_classes > len(self.class_dict.keys()):
-            self.noise_prob  = self.compute_noise_prob()
+        # if self.total_classes > len(self.class_dict.keys()):
+        #     self.noise_prob  = self.compute_noise_prob()
         
     def compute_noise_prob(self):
         counts = np.array(list(self.class_dict.values()))
