@@ -281,19 +281,14 @@ class CutMix(DatasetSplitSubset):
             bbx1, bby1, bbx2, bby2 = self.rand_bbox(img.size(), lamda)
             lamda = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (img.size()[-1] * img.size()[-2]))
             
-            if self.noise_prob > 0. and np.random.rand() < self.noise_prob:
-                # generate noise
-                img2 = torch.randn_like(img)
-                label_onehot = label_onehot * lamda
+            if self.use_cutmix_reg == True:
+                rand_item = torch.multinomial(self.probs, 1).item()
             else:
-                if self.use_cutmix_reg == True:
-                    rand_item = torch.multinomial(self.probs, 1).item()
-                else:
-                    rand_item = random.choice(range(len(self.indices)))
+                rand_item = random.choice(range(len(self.indices)))
 
-                img2, label2 = self.dataset[self.indices[rand_item]]
-                label2_onehot = self.onehot(label2)
-                label_onehot = label_onehot * lamda + label2_onehot * (1. - lamda)
+            img2, label2 = self.dataset[self.indices[rand_item]]
+            label2_onehot = self.onehot(label2)
+            label_onehot = label_onehot * lamda + label2_onehot * (1. - lamda)
 
             img[:, bbx1:bbx2, bby1:bby2] = img2[:, bbx1:bbx2, bby1:bby2]
             
