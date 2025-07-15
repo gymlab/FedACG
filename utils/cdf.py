@@ -37,6 +37,41 @@ print(len(quantile_edges))
 q_values = np.round(norm.ppf(quantile_edges), 2)
 print(torch.tensor(q_values))
 
+
+def generate_LUT(e=2, m=1):
+    lut = []
+    total_bits = 1 + e + m
+    bias = (2 ** (e - 1)) - 1
+
+    for i in range(2 ** total_bits):
+        b = f'{i:0{total_bits}b}'
+        sign = int(b[0], 2)
+        exponent = int(b[1:1+e], 2)
+
+        if m > 0:
+            mantissa = int(b[1+e:], 2)
+            mantissa_val = mantissa / (2 ** m)
+        else:
+            mantissa_val = 0.0
+
+        exp_val = exponent - bias
+        value = (-1) ** sign * (1 + mantissa_val) * (2 ** exp_val)
+        value = 0.0 if abs(value) < 1e-6 else round(value, 4)
+        lut.append(value)
+
+    unique_sorted_lut = sorted(set(lut))
+    return torch.tensor(unique_sorted_lut, dtype=torch.float32)
+
+E1M3 = generate_LUT(1, 3)  # e=1, m=3
+print(E1M3)
+print("-------------------------------------")
+E2M2 = generate_LUT(2, 2)  # e=2, m=2
+print(E2M2)
+print("-------------------------------------")
+E3M1 = generate_LUT(3, 1)  # e=3, m=1
+print(E3M1)
+
+
 quantile_centers = 0.5 * (quantile_edges[:-1] + quantile_edges[1:])
 edges = norm.ppf(quantile_centers)
 print(edges)
