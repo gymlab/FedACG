@@ -327,7 +327,7 @@ class CutMix(DatasetSplitSubset):
     
     
 class Mixup(DatasetSplitSubset):
-    def __init__(self, dataset, num_classes, num_mix=2, beta=1., use_cutmix_reg=False):
+    def __init__(self, dataset, num_classes, num_mix=2, beta=1., prob=1., use_mixup_reg=False):
         self.dataset = dataset.dataset
         self.subset_classes = dataset.subset_classes
 
@@ -337,9 +337,10 @@ class Mixup(DatasetSplitSubset):
         self.total_classes = num_classes
         self.num_mix = num_mix
         self.beta = beta
-        
-        self.use_cutmix_reg = use_cutmix_reg
-        if use_cutmix_reg == True:
+        self.prob = prob
+
+        self.use_mixup_reg = use_mixup_reg
+        if use_mixup_reg == True:
             self.probs = self.compute_sampling_probs()
         
     def compute_sampling_probs(self):
@@ -360,7 +361,7 @@ class Mixup(DatasetSplitSubset):
 
             # generate mixed sample
             lamda = np.random.beta(self.beta, self.beta)
-            if self.use_cutmix_reg == True:
+            if self.use_mixup_reg == True:
                 rand_item = torch.multinomial(self.probs, 1).item()
             else:
                 rand_item = random.choice(range(len(self.indices)))

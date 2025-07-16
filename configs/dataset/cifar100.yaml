@@ -4,6 +4,7 @@ path: './data'
 client_path: "./client_data"
 num_instances: 0
 download: True
+
 # cutmix param.
 cutmix:
   use: False
@@ -11,3 +12,11 @@ cutmix:
   beta: 1
   prob: 0.5
   cutmix_reg: False
+
+# mixup param.
+mixup:
+  use: False
+  num_mix: 2
+  beta: 1
+  prob: 0.5
+  mixup_reg: True
