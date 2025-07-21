@@ -30,8 +30,8 @@ for %%A in (0.1 0.3 0.6) do (
         wandb=True ^
         model=%MODEL% ^
         project="ICLR" ^
-        dataset.cutmix.use=True ^
-        dataset.cutmix.cutmix_reg=True ^
-        dataset.cutmix.prob=%CO_PROB%
+        dataset.cutout.use=True ^
+        dataset.cutout.use_reg=True ^
+        dataset.cutout.prob=%CO_PROB%
 
 )

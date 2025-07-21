@@ -26,9 +26,9 @@ python federated_train.py client=Dyn server=FedDyn ^
     wandb=True ^
     model=%MODEL% ^
     project="ICLR" ^
-    dataset.cutmix.use=True ^
-    dataset.cutmix.cutmix_reg=True ^
-    dataset.cutmix.prob=%CO_PROB%
+    dataset.cutout.use=True ^
+    dataset.cutout.use_reg=True ^
+    dataset.cutout.prob=%CO_PROB%
 
 pause
 
