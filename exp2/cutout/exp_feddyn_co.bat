@@ -2,10 +2,10 @@
 setlocal enabledelayedexpansion
 
 set CUDA_VISIBLE_DEVICES=0
-set DATASET=cifar10
-set MODEL=resnet18_WS
-set ALPHA=0.6
-set cm_prob=0.2
+set DATASET=cifar100
+set MODEL=resnet18
+set ALPHA=0.3
+set CO_PROB=0.2
 cd ..
 
 
@@ -15,9 +15,9 @@ if "%DATASET%"=="tinyimagenet" (
     set BATCH_SIZE=50
 )
 
-python federated_train.py client=base server=base ^
+python federated_train.py client=Dyn server=FedDyn ^
     visible_devices='%CUDA_VISIBLE_DEVICES%' ^
-    exp_name="FedAvgWS_mu%cm_prob%_%ALPHA%" ^
+    exp_name="FedDyn_co%CO_PROB%_%ALPHA%" ^
     dataset=%DATASET% ^
     trainer.num_clients=100 ^
     split.alpha=%ALPHA% ^
@@ -26,9 +26,9 @@ python federated_train.py client=base server=base ^
     wandb=True ^
     model=%MODEL% ^
     project="ICLR" ^
-    dataset.mixup.use=True ^
-    dataset.mixup.mixup_reg=True ^
-    dataset.mixup.prob=%cm_prob%
+    dataset.cutmix.use=True ^
+    dataset.cutmix.cutmix_reg=True ^
+    dataset.cutmix.prob=%CO_PROB%
 
 pause
 
