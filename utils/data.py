@@ -11,7 +11,20 @@ import json
 from collections import OrderedDict
 
 import numpy as np
+import matplotlib.pyplot as plt
 
+# img: Tensor (C, H, W) 형태라고 가정
+def show_tensor_image(img):
+    if isinstance(img, torch.Tensor):
+        img = img.detach().cpu()
+        if img.dim() == 3 and img.size(0) in [1, 3]:
+            img = img.permute(1, 2, 0)  # (C, H, W) -> (H, W, C)
+        img = img.numpy()
+    img = img.clip(0, 1)  # clip 추가
+    plt.imshow(img)
+    plt.axis('off')
+    plt.show()
+    
 __all__ = ['DatasetSplit', 'DatasetSplitSubset', 'DatasetSplitMultiView', 'get_dataset', 'MultiViewDataInjector', 'GaussianBlur', 'TransformTwice'
                                                                                                             ]
 
@@ -353,7 +366,7 @@ class Mixup(DatasetSplitSubset):
     def __getitem__(self, item):
         img, label = self.dataset[self.indices[item]]
         label_onehot = self.onehot(label)
-
+        show_tensor_image(img)
         for _ in range(self.num_mix):
             r = np.random.rand(1)
             if self.beta <= 0 or r > self.prob:
@@ -365,16 +378,192 @@ class Mixup(DatasetSplitSubset):
                 rand_item = torch.multinomial(self.probs, 1).item()
             else:
                 rand_item = random.choice(range(len(self.indices)))
-
             img2, label2 = self.dataset[self.indices[rand_item]]
+            show_tensor_image(img2)
             label2_onehot = self.onehot(label2)
 
             img = img * lamda + img2 * (1. - lamda)
+            show_tensor_image(img)
             label_onehot = label_onehot * lamda + label2_onehot * (1. - lamda)
-
+        show_tensor_image(img)
         return img, label_onehot
 
     def onehot(self, target):
         vec = torch.zeros(self.total_classes, dtype=torch.float32)
         vec[target] = 1.
         return vec
+
+class CutMixup(DatasetSplitSubset):
+    def __init__(self, dataset, num_classes, num_mix=2,
+                 cutmix_prob=1.0, cutmix_beta=1.0,
+                 mixup_prob=1.0, mixup_beta=1.0,
+                 use_reg=False):
+        self.dataset = dataset.dataset
+        self.subset_classes = dataset.subset_classes
+
+        self.class_dict = dataset.class_dict
+        self.indices = dataset.indices
+
+        self.total_classes = num_classes
+        self.num_mix = num_mix
+
+        self.cutmix_prob = cutmix_prob
+        self.cutmix_beta = cutmix_beta
+        self.mixup_prob = mixup_prob
+        self.mixup_beta = mixup_beta
+
+        self.use_reg = use_reg
+        if use_reg:
+            self.probs = self.compute_sampling_probs()
+
+    def __getitem__(self, item):
+        img, label = self.dataset[self.indices[item]]
+        label_onehot = self.onehot(label)
+        show_tensor_image(img)
+        for _ in range(self.num_mix):
+            r = np.random.rand(1)
+            if self.cutmix_beta <= 0 or r > self.cutmix_prob:
+                continue
+
+            lamda = np.random.beta(self.cutmix_beta, self.cutmix_beta)
+            bbx1, bby1, bbx2, bby2 = self.rand_bbox(img.size(), lamda)
+            lamda = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (img.size()[-1] * img.size()[-2]))
+
+            if self.use_reg:
+                rand_item = torch.multinomial(self.probs, 1).item()
+            else:
+                rand_item = random.choice(range(len(self.indices)))
+                
+            img2, label2 = self.dataset[self.indices[rand_item]]
+            label2_onehot = self.onehot(label2)
+            show_tensor_image(img2)
+
+            # mixup inside the patch
+            patch1 = img[:, bbx1:bbx2, bby1:bby2]
+            show_tensor_image(patch1)
+            patch2 = img2[:, bbx1:bbx2, bby1:bby2]
+            show_tensor_image(patch2)
+
+            if self.mixup_beta > 0 and np.random.rand(1) < self.mixup_prob:
+                lambda2 = np.random.beta(self.mixup_beta, self.mixup_beta)
+                patch = patch1 * lambda2 + patch2 * (1 - lambda2)
+                label_mix = label_onehot * lambda2 + label2_onehot * (1. - lambda2)
+            else:
+                patch = patch2
+                label_mix = label_onehot * lamda + label2_onehot * (1. - lamda)
+
+            img[:, bbx1:bbx2, bby1:bby2] = patch
+            label_onehot = label_mix  # overwrite label with patch-mixed label
+        show_tensor_image(img)
+        return img, label_onehot
+
+    def onehot(self, target):
+        vec = torch.zeros(self.total_classes, dtype=torch.float32)
+        vec[target] = 1.
+        return vec
+
+    def compute_sampling_probs(self):
+        label_list = [self.dataset[idx][-1] for idx in self.indices]
+        class_counts = torch.tensor([self.class_dict[str(label)] for label in label_list])
+        weights = 1. / (class_counts + 1e-6)
+        probs = weights / weights.sum()
+        return probs
+    
+    @staticmethod
+    def rand_bbox(size, lam):
+        if len(size) == 4:
+            W = size[2]
+            H = size[3]
+        elif len(size) == 3:
+            W = size[1]
+            H = size[2]
+        else:
+            raise Exception
+
+        cut_rat = np.sqrt(1. - lam)
+        cut_w = int(W * cut_rat)
+        cut_h = int(H * cut_rat)
+        
+        # uniform
+        cx = np.random.randint(W)
+        cy = np.random.randint(H)
+
+        bbx1 = np.clip(cx - cut_w // 2, 0, W)
+        bby1 = np.clip(cy - cut_h // 2, 0, H)
+        bbx2 = np.clip(cx + cut_w // 2, 0, W)
+        bby2 = np.clip(cy + cut_h // 2, 0, H)
+
+        return bbx1, bby1, bbx2, bby2
+    
+    
+class Cutout(DatasetSplitSubset):
+    def __init__(self, dataset, num_classes, num_mix=2, beta=1., prob=1.0, use_reg=False):
+        self.dataset = dataset.dataset
+        self.subset_classes = dataset.subset_classes
+
+        self.class_dict = dataset.class_dict
+        self.indices = dataset.indices
+
+        self.total_classes = num_classes
+        self.num_mix = num_mix
+        self.beta = beta
+        self.prob = prob
+
+        self.use_reg = use_reg
+        if use_reg:
+            self.probs = self.compute_sampling_probs()
+            
+    def compute_sampling_probs(self):
+        label_list = [self.dataset[idx][-1] for idx in self.indices]
+        class_counts = torch.tensor([self.class_dict[str(label)] for label in label_list])
+        weights = 1. / (class_counts + 1e-6)
+        probs = weights / weights.sum()
+        return probs
+    
+    def __getitem__(self, item):
+        img, label = self.dataset[self.indices[item]]
+        label_onehot = self.onehot(label)
+        show_tensor_image(img)
+        for _ in range(self.num_mix):
+            r = np.random.rand(1)
+            if self.beta <= 0 or r > self.prob:
+                continue
+            # generate mixed sample
+            lamda = np.random.beta(self.beta, self.beta)
+            bbx1, bby1, bbx2, bby2 = self.rand_bbox(img.size(), lamda)
+            lamda = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (img.size()[-1] * img.size()[-2]))
+
+            img[:, bbx1:bbx2, bby1:bby2] = 0
+        show_tensor_image(img)            
+        return img, label_onehot
+
+    def onehot(self, target):
+        vec = torch.zeros(self.total_classes, dtype=torch.float32)
+        vec[target] = 1.
+        return vec
+    
+    @staticmethod
+    def rand_bbox(size, lam):
+        if len(size) == 4:
+            W = size[2]
+            H = size[3]
+        elif len(size) == 3:
+            W = size[1]
+            H = size[2]
+        else:
+            raise Exception
+
+        cut_rat = np.sqrt(1. - lam)
+        cut_w = int(W * cut_rat)
+        cut_h = int(H * cut_rat)
+        
+        # uniform
+        cx = np.random.randint(W)
+        cy = np.random.randint(H)
+
+        bbx1 = np.clip(cx - cut_w // 2, 0, W)
+        bby1 = np.clip(cy - cut_h // 2, 0, H)
+        bbx2 = np.clip(cx + cut_w // 2, 0, W)
+        bby2 = np.clip(cy + cut_h // 2, 0, H)
+
+        return bbx1, bby1, bbx2, bby2

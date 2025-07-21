@@ -9,7 +9,7 @@ import gc
 
 from utils import *
 from utils.metrics import evaluate
-from utils.data import CutMix, Mixup
+from utils.data import CutMix, Mixup, CutMixup, Cutout
 from models import build_encoder
 from typing import Callable, Dict, Tuple, Union, List
 from utils.logging_utils import AverageMeter
@@ -65,7 +65,26 @@ class Client():
                                    num_classes=len(local_dataset.dataset.classes), 
                                    num_mix=self.args.dataset.mixup.num_mix,
                                    beta=self.args.dataset.mixup.beta,
+                                   prob=self.args.dataset.mixup.prob,
                                    use_mixup_reg=self.args.dataset.mixup.mixup_reg)
+
+        if self.args.dataset.cutmixup.use == True:
+            local_dataset = CutMixup(local_dataset, 
+                                   num_classes=len(local_dataset.dataset.classes), 
+                                   num_mix=self.args.dataset.cutmixup.num_mix,
+                                   cutmix_beta=self.args.dataset.cutmixup.cutmix_beta,
+                                   cutmix_prob=self.args.dataset.cutmixup.cutmix_prob,
+                                   mixup_beta=self.args.dataset.cutmixup.mixup_beta,
+                                   mixup_prob=self.args.dataset.cutmixup.mixup_prob,
+                                   use_reg=self.args.dataset.cutmixup.use_reg)
+        
+        if self.args.dataset.cutout.use == True:
+            local_dataset = Cutout(local_dataset, 
+                                   num_classes=len(local_dataset.dataset.classes), 
+                                   num_mix=self.args.dataset.cutout.num_mix,
+                                   beta=self.args.dataset.cutout.beta,
+                                   prob=self.args.dataset.cutout.prob,
+                                   use_reg=self.args.dataset.cutout.use_reg)
 
 
         self.loader =  DataLoader(local_dataset, batch_size=self.args.batch_size, sampler=train_sampler, shuffle=train_sampler is None,
