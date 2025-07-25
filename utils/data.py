@@ -366,7 +366,7 @@ class Mixup(DatasetSplitSubset):
     def __getitem__(self, item):
         img, label = self.dataset[self.indices[item]]
         label_onehot = self.onehot(label)
-        show_tensor_image(img)
+        # show_tensor_image(img)
         for _ in range(self.num_mix):
             r = np.random.rand(1)
             if self.beta <= 0 or r > self.prob:
@@ -379,13 +379,13 @@ class Mixup(DatasetSplitSubset):
             else:
                 rand_item = random.choice(range(len(self.indices)))
             img2, label2 = self.dataset[self.indices[rand_item]]
-            show_tensor_image(img2)
+            # show_tensor_image(img2)
             label2_onehot = self.onehot(label2)
 
             img = img * lamda + img2 * (1. - lamda)
-            show_tensor_image(img)
+            # show_tensor_image(img)
             label_onehot = label_onehot * lamda + label2_onehot * (1. - lamda)
-        show_tensor_image(img)
+        # show_tensor_image(img)
         return img, label_onehot
 
     def onehot(self, target):
@@ -419,7 +419,7 @@ class CutMixup(DatasetSplitSubset):
     def __getitem__(self, item):
         img, label = self.dataset[self.indices[item]]
         label_onehot = self.onehot(label)
-        show_tensor_image(img)
+        # show_tensor_image(img)
         for _ in range(self.num_mix):
             r = np.random.rand(1)
             if self.cutmix_beta <= 0 or r > self.cutmix_prob:
@@ -436,13 +436,13 @@ class CutMixup(DatasetSplitSubset):
                 
             img2, label2 = self.dataset[self.indices[rand_item]]
             label2_onehot = self.onehot(label2)
-            show_tensor_image(img2)
+            # show_tensor_image(img2)
 
             # mixup inside the patch
             patch1 = img[:, bbx1:bbx2, bby1:bby2]
-            show_tensor_image(patch1)
+            # show_tensor_image(patch1)
             patch2 = img2[:, bbx1:bbx2, bby1:bby2]
-            show_tensor_image(patch2)
+            # show_tensor_image(patch2)
 
             if self.mixup_beta > 0 and np.random.rand(1) < self.mixup_prob:
                 lambda2 = np.random.beta(self.mixup_beta, self.mixup_beta)
@@ -454,7 +454,7 @@ class CutMixup(DatasetSplitSubset):
 
             img[:, bbx1:bbx2, bby1:bby2] = patch
             label_onehot = label_mix  # overwrite label with patch-mixed label
-        show_tensor_image(img)
+        # show_tensor_image(img)
         return img, label_onehot
 
     def onehot(self, target):
@@ -523,7 +523,7 @@ class Cutout(DatasetSplitSubset):
     def __getitem__(self, item):
         img, label = self.dataset[self.indices[item]]
         label_onehot = self.onehot(label)
-        show_tensor_image(img)
+        # show_tensor_image(img)
         for _ in range(self.num_mix):
             r = np.random.rand(1)
             if self.beta <= 0 or r > self.prob:
@@ -534,7 +534,7 @@ class Cutout(DatasetSplitSubset):
             lamda = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (img.size()[-1] * img.size()[-2]))
 
             img[:, bbx1:bbx2, bby1:bby2] = 0
-        show_tensor_image(img)            
+        # show_tensor_image(img)            
         return img, label_onehot
 
     def onehot(self, target):
