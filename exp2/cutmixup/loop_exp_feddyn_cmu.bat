@@ -1,11 +1,11 @@
 @echo off
 setlocal enabledelayedexpansion
 
-set DATASET=cifar10
+set DATASET=cifar100
 set CM_PROB=0.2
 set MU_PROB=0.2
 set MODEL=resnet18
-cd ..
+cd ../..
 for %%A in (0.1 0.3 0.6) do (
     set ALPHA=%%A
             

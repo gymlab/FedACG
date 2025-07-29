@@ -38,3 +38,12 @@ cutout:
   beta: 1
   prob: 0.5
   use_reg: True
+
+# cutmixup param.
+new_cutmixup:
+  use: True
+  cutmix_beta: 1
+  cutmix_prob: 0.1
+  mixup_beta: 1
+  mixup_prob: 0.1
+  use_reg: True

@@ -4,7 +4,7 @@ setlocal enabledelayedexpansion
 set DATASET=cifar10
 set MU_PROB=0.2
 set MODEL=resnet18_WS
-cd ..
+cd ../..
 for %%A in (0.1 0.3 0.6) do (
     set ALPHA=%%A
             

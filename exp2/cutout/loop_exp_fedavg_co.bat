@@ -4,7 +4,7 @@ setlocal enabledelayedexpansion
 set DATASET=cifar10
 set CO_PROB=0.2
 set MODEL=resnet18
-cd ..
+cd ../..
 for %%A in (0.1 0.3 0.6) do (
     set ALPHA=%%A
             
@@ -14,7 +14,7 @@ for %%A in (0.1 0.3 0.6) do (
         set BATCH_SIZE=50
     )
 
-    set EXP_NAME=FedAvg_cm%CO_PROB%_%%A
+    set EXP_NAME=FedAvg_co%CO_PROB%_%%A
     
     echo Running experiment 
     set CUDA_VISIBLE_DEVICES=0

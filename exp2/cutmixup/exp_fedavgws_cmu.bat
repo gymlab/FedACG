@@ -2,12 +2,12 @@
 setlocal enabledelayedexpansion
 
 set CUDA_VISIBLE_DEVICES=0
-set DATASET=cifar100
+set DATASET=tinyimagenet
 set MODEL=resnet18_WS
-set ALPHA=0.3
+set ALPHA=0.6
 set CM_PROB=0.2
 set MU_PROB=0.2
-cd ..
+cd ../..
 
 
 if "%DATASET%"=="tinyimagenet" (
