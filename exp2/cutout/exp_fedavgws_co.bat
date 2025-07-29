@@ -6,7 +6,7 @@ set DATASET=cifar100
 set MODEL=resnet18_WS
 set ALPHA=0.3
 set CO_PROB=0.2
-cd ..
+cd ../..
 
 
 if "%DATASET%"=="tinyimagenet" (

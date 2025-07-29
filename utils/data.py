@@ -572,3 +572,104 @@ class Cutout(DatasetSplitSubset):
         bby2 = np.clip(cy + cut_h // 2, 0, H)
 
         return bbx1, bby1, bbx2, bby2
+    
+    
+class NEWCutMixup(DatasetSplitSubset):
+    def __init__(self, dataset, num_classes,
+                 cutmix_prob=1.0, cutmix_beta=1.0,
+                 mixup_prob=1.0, mixup_beta=1.0,
+                 use_reg=False):
+        self.dataset = dataset.dataset
+        self.subset_classes = dataset.subset_classes
+
+        self.class_dict = dataset.class_dict
+        self.indices = dataset.indices
+
+        self.total_classes = num_classes
+
+        self.cutmix_prob = cutmix_prob
+        self.cutmix_beta = cutmix_beta
+        self.mixup_prob = mixup_prob
+        self.mixup_beta = mixup_beta
+
+        self.use_reg = use_reg
+        if use_reg:
+            self.probs = self.compute_sampling_probs()
+
+    # cutmix 0.1 / mixup 0.1 / none 0.8       
+    def __getitem__(self, item):
+        img, label = self.dataset[self.indices[item]]
+        label_onehot = self.onehot(label)
+
+        r = np.random.rand(1)
+
+        if (self.cutmix_beta > 0) and (r < self.cutmix_prob):
+            
+            lamda = np.random.beta(self.cutmix_beta, self.cutmix_beta)
+            bbx1, bby1, bbx2, bby2 = self.rand_bbox(img.size(), lamda)
+            lamda = 1 - ((bbx2 - bbx1) * (bby2 - bby1)) / (img.size()[-1] * img.size()[-2])
+
+            if self.use_reg == True:
+                rand_item = torch.multinomial(self.probs, 1).item()
+            else:
+                rand_item = random.choice(range(len(self.indices)))
+                    
+            img2, label2 = self.dataset[self.indices[rand_item]]
+            label2_onehot = self.onehot(label2)
+            label_onehot = label_onehot * lamda + label2_onehot * (1. - lamda)
+
+            img[:, bbx1:bbx2, bby1:bby2] = img2[:, bbx1:bbx2, bby1:bby2]
+
+        elif (self.mixup_beta > 0) and (r < self.cutmix_prob + self.mixup_prob):
+            lamda = np.random.beta(self.mixup_beta, self.mixup_beta)
+
+            if self.use_reg == True:
+                rand_item = torch.multinomial(self.probs, 1).item()
+            else:
+                rand_item = random.choice(range(len(self.indices)))
+                
+            img2, label2 = self.dataset[self.indices[rand_item]]
+            label2_onehot = self.onehot(label2)
+
+            img = img * lamda + img2 * (1. - lamda)
+            label_onehot = label_onehot * lamda + label2_onehot * (1. - lamda)
+
+        return img, label_onehot
+
+    def onehot(self, target):
+        vec = torch.zeros(self.total_classes, dtype=torch.float32)
+        vec[target] = 1.
+        return vec
+
+    def compute_sampling_probs(self):
+        label_list = [self.dataset[idx][-1] for idx in self.indices]
+        class_counts = torch.tensor([self.class_dict[str(label)] for label in label_list])
+        weights = 1. / (class_counts + 1e-6)
+        probs = weights / weights.sum()
+        return probs
+    
+    @staticmethod
+    def rand_bbox(size, lam):
+        if len(size) == 4:
+            W = size[2]
+            H = size[3]
+        elif len(size) == 3:
+            W = size[1]
+            H = size[2]
+        else:
+            raise Exception
+
+        cut_rat = np.sqrt(1. - lam)
+        cut_w = int(W * cut_rat)
+        cut_h = int(H * cut_rat)
+        
+        # uniform
+        cx = np.random.randint(W)
+        cy = np.random.randint(H)
+
+        bbx1 = np.clip(cx - cut_w // 2, 0, W)
+        bby1 = np.clip(cy - cut_h // 2, 0, H)
+        bbx2 = np.clip(cx + cut_w // 2, 0, W)
+        bby2 = np.clip(cy + cut_h // 2, 0, H)
+
+        return bbx1, bby1, bbx2, bby2

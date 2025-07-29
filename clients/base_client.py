@@ -9,7 +9,7 @@ import gc
 
 from utils import *
 from utils.metrics import evaluate
-from utils.data import CutMix, Mixup, CutMixup, Cutout
+from utils.data import CutMix, Mixup, CutMixup, Cutout, NEWCutMixup
 from models import build_encoder
 from typing import Callable, Dict, Tuple, Union, List
 from utils.logging_utils import AverageMeter
@@ -85,7 +85,15 @@ class Client():
                                    beta=self.args.dataset.cutout.beta,
                                    prob=self.args.dataset.cutout.prob,
                                    use_reg=self.args.dataset.cutout.use_reg)
-
+        
+        if self.args.dataset.new_cutmixup.use == True:
+            local_dataset = NEWCutMixup(local_dataset, 
+                                   num_classes=len(local_dataset.dataset.classes), 
+                                   cutmix_beta=self.args.dataset.new_cutmixup.cutmix_beta,
+                                   cutmix_prob=self.args.dataset.new_cutmixup.cutmix_prob,
+                                   mixup_beta=self.args.dataset.new_cutmixup.mixup_beta,
+                                   mixup_prob=self.args.dataset.new_cutmixup.mixup_prob,
+                                   use_reg=self.args.dataset.new_cutmixup.use_reg)
 
         self.loader =  DataLoader(local_dataset, batch_size=self.args.batch_size, sampler=train_sampler, shuffle=train_sampler is None,
                                    num_workers=self.args.num_workers, pin_memory=self.args.pin_memory)

@@ -7,7 +7,7 @@ set MODEL=resnet18
 set ALPHA=0.3
 set CM_PROB=0.2
 set MU_PROB=0.2
-cd ..
+cd ../..
 
 
 if "%DATASET%"=="tinyimagenet" (
