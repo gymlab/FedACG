@@ -4,7 +4,7 @@ setlocal enabledelayedexpansion
 set DATASET=cifar10
 set CM_PROB=0.1
 set MU_PROB=0.1
-set MODEL=resnet18_WS
+set MODEL=resnet18
 cd ../..
 for %%A in (0.1 0.3 0.6) do (
     set ALPHA=%%A
@@ -15,12 +15,12 @@ for %%A in (0.1 0.3 0.6) do (
         set BATCH_SIZE=50
     )
 
-    set EXP_NAME=FedProx_ncmu%CM_PROB%_%%A
+    set EXP_NAME=FedAvg_ncmu%CM_PROB%_%%A
     
     echo Running experiment 
     set CUDA_VISIBLE_DEVICES=0
 
-    python federated_train.py client=Prox server=base ^
+    python federated_train.py client=base server=base ^
         visible_devices='%CUDA_VISIBLE_DEVICES%' ^
         exp_name=!EXP_NAME! ^
         dataset=%DATASET% ^
@@ -35,6 +35,5 @@ for %%A in (0.1 0.3 0.6) do (
         dataset.new_cutmixup.use_reg=True ^
         dataset.new_cutmixup.cutmix_prob=%CM_PROB% ^
         dataset.new_cutmixup.mixup_prob=%MU_PROB%
-
 
 )
