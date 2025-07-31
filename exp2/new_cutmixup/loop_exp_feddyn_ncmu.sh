@@ -21,7 +21,7 @@ for DATASET in "${data_sets[@]}"; do
         if [ "$SPLIT_MODE" = "iid" ]; then
             # For iid mode, no need to iterate over alpha
             ALPHA=0.6
-            EXP_NAME=FedDyn_ncmu"$MU_PROB"_iid
+            EXP_NAME=FedDyn_ncmu"$CM_PROB"_"$MU_PROB"_iid
             python3 federated_train.py client=Dyn server=FedDyn visible_devices=\'$DEVICE\' \
                 exp_name="$EXP_NAME" dataset="$DATASET" trainer.num_clients=100 \
                 split.mode="$SPLIT_MODE" trainer.participation_rate=0.05 \
@@ -31,7 +31,7 @@ for DATASET in "${data_sets[@]}"; do
         else
             # For non-iid mode, iterate over alpha values
             for ALPHA in "${alpha_values[@]}"; do
-                EXP_NAME=FedDyn_ncmu"$MU_PROB"_"$ALPHA"
+                EXP_NAME=FedDyn_ncmu"$CM_PROB"_"$MU_PROB"_"$ALPHA"
                 python3 federated_train.py client=Dyn server=FedDyn visible_devices=\'$DEVICE\' \
                     exp_name="$EXP_NAME" dataset="$DATASET" trainer.num_clients=100 \
                     split.mode="$SPLIT_MODE" split.alpha="$ALPHA" trainer.participation_rate=0.05 \

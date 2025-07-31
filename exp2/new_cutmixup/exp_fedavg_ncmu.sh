@@ -8,7 +8,7 @@ ALPHA=0.6
 CM_PROB=0.1
 MU_PROB=0.1
 
-python3 federated_train.py visible_devices=\'$DEVICE\' client=base server=base exp_name=FedAvg_ncmu"$CM_PROB""$MU_PROB"_iid \
+python3 federated_train.py visible_devices=\'$DEVICE\' client=base server=base exp_name=FedAvg_ncmu"$CM_PROB"_"$MU_PROB"_iid \
  dataset=${DATASET} trainer.num_clients=100 split.alpha=${ALPHA} trainer.participation_rate=0.05 \
  dataset.new_cutmixup.use=true dataset.new_cutmixup.use_reg=true \
  dataset.new_cutmixup.cutmix_prob=${CM_PROB} dataset.new_cutmixup.mixup_prob=${MU_PROB} \
