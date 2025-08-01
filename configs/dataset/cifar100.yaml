@@ -8,7 +8,7 @@ download: True
 # cutmix param.
 cutmix:
   use: False
-  num_mix: 2
+  num_mix: 1
   beta: 1
   prob: 0.5
   cutmix_reg: False
@@ -16,7 +16,7 @@ cutmix:
 # mixup param.
 mixup:
   use: False
-  num_mix: 2
+  num_mix: 1
   beta: 1
   prob: 0.5
   mixup_reg: True
@@ -24,7 +24,7 @@ mixup:
 # cutmixup param.
 cutmixup:
   use: False
-  num_mix: 2
+  num_mix: 1
   cutmix_beta: 1
   cutmix_prob: 0.5
   mixup_beta: 1
@@ -34,14 +34,14 @@ cutmixup:
 # cutout param.
 cutout:
   use: False
-  num_mix: 2
+  num_mix: 1
   beta: 1
   prob: 0.5
   use_reg: True
 
 # cutmixup param.
 new_cutmixup:
-  use: True
+  use: False
   cutmix_beta: 1
   cutmix_prob: 0.1
   mixup_beta: 1
