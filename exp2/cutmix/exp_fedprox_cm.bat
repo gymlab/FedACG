@@ -17,10 +17,10 @@ if "%DATASET%"=="tinyimagenet" (
 
 python federated_train.py client=Prox server=base ^
     visible_devices='%CUDA_VISIBLE_DEVICES%' ^
-    exp_name="FedProx_cm%CM_PROB%_%ALPHA%" ^
+    exp_name="FedProx_cm%CM_PROB%_iid_num1" ^
     dataset=%DATASET% ^
     trainer.num_clients=100 ^
-    split.alpha=%ALPHA% ^
+    split.mode=iid ^
     trainer.participation_rate=0.05 ^
     batch_size=!BATCH_SIZE! ^
     wandb=True ^
