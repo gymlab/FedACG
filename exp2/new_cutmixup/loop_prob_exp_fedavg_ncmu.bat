@@ -2,20 +2,20 @@
 setlocal enabledelayedexpansion
 
 set MODEL=resnet18
-set BATCH_SIZE=50
+set BATCH_SIZE=100
 set CUDA_VISIBLE_DEVICES=0
-set DATASET=cifar10
+set DATASET=tinyimagenet
 set ALPHA=0.3
 cd ../..
 
-for %%P in (0.15 0.2) do (
+for %%P in (0.15) do (
     call set CM_PROB=%%P
     call set MU_PROB=%%P
-    set EXP_NAME=FedDyn_ncmu%%P_%%P_%ALPHA%
+    set EXP_NAME=FedAvg_ncmu%%P_%%P_%ALPHA%
 
     echo Running experiment for %DATASET%
 
-    python federated_train.py client=Dyn server=FedDyn ^
+    python federated_train.py client=base server=base ^
         visible_devices='%CUDA_VISIBLE_DEVICES%' ^
         exp_name=!EXP_NAME! ^
         dataset=%DATASET% ^

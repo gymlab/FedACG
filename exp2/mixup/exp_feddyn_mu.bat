@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 set CUDA_VISIBLE_DEVICES=0
-set DATASET=cifar100
+set DATASET=cifar10
 set MODEL=resnet18
 set ALPHA=0.3
 set MU_PROB=0.2
@@ -17,10 +17,10 @@ if "%DATASET%"=="tinyimagenet" (
 
 python federated_train.py client=Dyn server=FedDyn ^
     visible_devices='%CUDA_VISIBLE_DEVICES%' ^
-    exp_name="FedDyn_mu%MU_PROB%_%ALPHA%" ^
+    exp_name="FedDyn_mu%MU_PROB%_iid_num1" ^
     dataset=%DATASET% ^
     trainer.num_clients=100 ^
-    split.alpha=%ALPHA% ^
+    split.mode=iid ^
     trainer.participation_rate=0.05 ^
     batch_size=!BATCH_SIZE! ^
     wandb=True ^

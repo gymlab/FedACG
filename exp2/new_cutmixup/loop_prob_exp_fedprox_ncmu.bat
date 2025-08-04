@@ -11,11 +11,11 @@ cd ../..
 for %%P in (0.15 0.2) do (
     call set CM_PROB=%%P
     call set MU_PROB=%%P
-    set EXP_NAME=FedDyn_ncmu%%P_%%P_%ALPHA%
+    set EXP_NAME=FedProx_ncmu%%P_%%P_%ALPHA%
 
     echo Running experiment for %DATASET%
 
-    python federated_train.py client=Dyn server=FedDyn ^
+    python federated_train.py client=Prox server=base ^
         visible_devices='%CUDA_VISIBLE_DEVICES%' ^
         exp_name=!EXP_NAME! ^
         dataset=%DATASET% ^
