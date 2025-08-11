@@ -2,15 +2,21 @@
 setlocal enabledelayedexpansion
 
 set MODEL=resnet18_WS
-set BATCH_SIZE=100
 set CUDA_VISIBLE_DEVICES=0
-set DATASET=tinyimagenet
+set DATASET=cifar10
 set ALPHA=0.3
 cd ../..
 
 for %%P in (0.2 0.3 0.4) do (
     call set CM_PROB=%%P
-    set EXP_NAME=FedAvgWS_cm%%P_%%P_%ALPHA%_num1
+
+    if "%DATASET%"=="tinyimagenet" (
+    set BATCH_SIZE=100
+    ) else (
+        set BATCH_SIZE=50
+    )
+
+    set EXP_NAME=FedAvgWS_cm%%P_%ALPHA%_num1
 
     echo Running experiment for %DATASET%
 
@@ -21,7 +27,7 @@ for %%P in (0.2 0.3 0.4) do (
         trainer.num_clients=100 ^
         split.alpha=%ALPHA% ^
         trainer.participation_rate=0.05 ^
-        batch_size=%BATCH_SIZE% ^
+        batch_size=!BATCH_SIZE! ^
         wandb=True ^
         model=%MODEL% ^
         project="ICLR" ^

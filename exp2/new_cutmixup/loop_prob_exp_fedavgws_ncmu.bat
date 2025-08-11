@@ -13,6 +13,12 @@ for %%P in (0.1 0.15 0.2) do (
     call set MU_PROB=%%P
     set EXP_NAME=FedAvgWS_ncmu%%P_%%P_%ALPHA%_num1
 
+    if "%DATASET%"=="tinyimagenet" (
+    set BATCH_SIZE=100
+    ) else (
+        set BATCH_SIZE=50
+    )
+
     echo Running experiment for %DATASET%
 
     python federated_train.py client=base server=base ^
@@ -22,7 +28,7 @@ for %%P in (0.1 0.15 0.2) do (
         trainer.num_clients=100 ^
         split.alpha=%ALPHA% ^
         trainer.participation_rate=0.05 ^
-        batch_size=%BATCH_SIZE% ^
+        batch_size=!BATCH_SIZE! ^
         wandb=True ^
         model=%MODEL% ^
         project="ICLR" ^

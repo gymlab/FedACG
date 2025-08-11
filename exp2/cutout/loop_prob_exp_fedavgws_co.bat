@@ -1,26 +1,26 @@
 @echo off
 setlocal enabledelayedexpansion
 
-set MODEL=resnet18
+set MODEL=resnet18_WS
 set CUDA_VISIBLE_DEVICES=0
 set DATASET=cifar10
 set ALPHA=0.3
 cd ../..
 
-for %%P in (0.15 0.2) do (
-    call set CM_PROB=%%P
-    call set MU_PROB=%%P
+for %%P in (0.2 0.3 0.4) do (
+    call set CO_PROB=%%P
 
     if "%DATASET%"=="tinyimagenet" (
     set BATCH_SIZE=100
     ) else (
         set BATCH_SIZE=50
     )
-    set EXP_NAME=FedProx_ncmu%%P_%%P_%ALPHA%
+
+    set EXP_NAME=FedAvgWS_co%%P_%ALPHA%_num1
 
     echo Running experiment for %DATASET%
 
-    python federated_train.py client=Prox server=base ^
+    python federated_train.py client=base server=base ^
         visible_devices='%CUDA_VISIBLE_DEVICES%' ^
         exp_name=!EXP_NAME! ^
         dataset=%DATASET% ^
@@ -31,10 +31,8 @@ for %%P in (0.15 0.2) do (
         wandb=True ^
         model=%MODEL% ^
         project="ICLR" ^
-        dataset.new_cutmixup.use=True ^
-        dataset.new_cutmixup.use_reg=True ^
-        dataset.new_cutmixup.cutmix_prob=%%P ^
-        dataset.new_cutmixup.mixup_prob=%%P 
+        dataset.cutout.use=True ^
+        dataset.cutout.use_reg=True ^
+        dataset.cutout.prob=%CO_PROB%
 )
-
 endlocal
