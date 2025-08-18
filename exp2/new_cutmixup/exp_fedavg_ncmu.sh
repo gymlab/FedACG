@@ -12,5 +12,5 @@ python3 federated_train.py visible_devices=\'$DEVICE\' client=base server=base e
  dataset=${DATASET} trainer.num_clients=100 split.alpha=${ALPHA} trainer.participation_rate=0.05 \
  dataset.new_cutmixup.use=true dataset.new_cutmixup.use_reg=true \
  dataset.new_cutmixup.cutmix_prob=${CM_PROB} dataset.new_cutmixup.mixup_prob=${MU_PROB} \
- batch_size=${BATCH_SIZE} wandb=True model=resnet18_WS project="ICLR" \
+ batch_size=${BATCH_SIZE} wandb=True model=resnet18 project="ICLR" \
  split.mode=iid

@@ -2,10 +2,10 @@
 
 data_sets=(cifar10)
 alpha_values=(0.3)
-models=(SqueezeNet_base)
-CM_PROB=0.2
-MU_PROB=0.2
-DEVICE=1
+models=(MobileViT VGG9_base ShuffleNet_base SqueezeNet_base)
+CM_PROB=0.15
+MU_PROB=0.15
+DEVICE=4
 
 for MODEL in "${models[@]}"; do
     if [ "$MODEL" = "MobileViT" ]; then
@@ -48,7 +48,7 @@ for MODEL in "${models[@]}"; do
             else
                 # For non-iid mode, iterate over alpha values
                 for ALPHA in "${alpha_values[@]}"; do
-                    EXP_NAME=FedAvg_ncmu"$CM_PROB"_"$MU_PROB"_"$ALPHA"
+                    EXP_NAME=FedAvg_"$MODEL_NAME"_ncmu"$CM_PROB"_"$MU_PROB"_"$ALPHA"
                     python3 federated_train.py client=base server=base visible_devices=\'$DEVICE\' \
                         exp_name="$EXP_NAME" dataset="$DATASET" trainer.num_clients=100 \
                         split.mode="$SPLIT_MODE" split.alpha="$ALPHA" trainer.participation_rate=0.05 \
