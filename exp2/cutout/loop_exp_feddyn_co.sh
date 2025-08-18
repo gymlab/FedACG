@@ -1,9 +1,9 @@
 #!/bin/bash
 
-data_sets=(cifar100)
-alpha_values=(0.1 0.3 0.6)
-CO_PROB=0.2
-DEVICE=3
+data_sets=(cifar10)
+alpha_values=(0.1 0.6)
+CO_PROB=0.3
+DEVICE=2
 
 # Iterate over datasets
 for DATASET in "${data_sets[@]}"; do
@@ -15,7 +15,7 @@ for DATASET in "${data_sets[@]}"; do
     fi
 
     # Iterate over split modes
-    for SPLIT_MODE in "dirichlet"; do
+    for SPLIT_MODE in "dirichlet" "iid"; do
 
         if [ "$SPLIT_MODE" = "iid" ]; then
             # For iid mode, no need to iterate over alphan

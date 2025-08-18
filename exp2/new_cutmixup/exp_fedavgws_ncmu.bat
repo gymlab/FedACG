@@ -3,7 +3,7 @@ setlocal enabledelayedexpansion
 
 set CUDA_VISIBLE_DEVICES=0
 set DATASET=cifar100
-set MODEL=resnet18
+set MODEL=resnet18_WS
 set ALPHA=0.1
 set CM_PROB=0.1
 set MU_PROB=0.1

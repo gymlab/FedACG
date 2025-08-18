@@ -2,9 +2,9 @@
 
 data_sets=(cifar10)
 alpha_values=(0.3)
-models=(SqueezeNet_base)
-CO_PROB=0.2
-DEVICE=1
+models=(MobileViT VGG9_base ShuffleNet_base SqueezeNet_base)
+CO_PROB=0.3
+DEVICE=2
 
 for MODEL in "${models[@]}"; do
     if [ "$MODEL" = "MobileViT" ]; then

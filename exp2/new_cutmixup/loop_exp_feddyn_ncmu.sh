@@ -1,10 +1,10 @@
 #!/bin/bash
 
-data_sets=(cifar10 cifar100)
-alpha_values=(0.3 0.1 0.6)
-CM_PROB=0.2
-MU_PROB=0.2
-DEVICE=1
+data_sets=(cifar10)
+alpha_values=(0.1 0.6)
+CM_PROB=0.15
+MU_PROB=0.15
+DEVICE=6
 
 # Iterate over datasets
 for DATASET in "${data_sets[@]}"; do
@@ -16,12 +16,12 @@ for DATASET in "${data_sets[@]}"; do
     fi
 
     # Iterate over split modes
-    for SPLIT_MODE in "iid" "dirichlet"; do
+    for SPLIT_MODE in "dirichlet" "iid"; do
 
         if [ "$SPLIT_MODE" = "iid" ]; then
             # For iid mode, no need to iterate over alpha
             ALPHA=0.6
-            EXP_NAME=FedDyn_ncmu"$CM_PROB"_"$MU_PROB"_iid
+            EXP_NAME=FedDyn_ncmu"$CM_PROB"_"$MU_PROB"_iid_num1
             python3 federated_train.py client=Dyn server=FedDyn visible_devices=\'$DEVICE\' \
                 exp_name="$EXP_NAME" dataset="$DATASET" trainer.num_clients=100 \
                 split.mode="$SPLIT_MODE" trainer.participation_rate=0.05 \
@@ -31,7 +31,7 @@ for DATASET in "${data_sets[@]}"; do
         else
             # For non-iid mode, iterate over alpha values
             for ALPHA in "${alpha_values[@]}"; do
-                EXP_NAME=FedDyn_ncmu"$CM_PROB"_"$MU_PROB"_"$ALPHA"
+                EXP_NAME=FedDyn_ncmu"$CM_PROB"_"$MU_PROB"_"$ALPHA"_num1
                 python3 federated_train.py client=Dyn server=FedDyn visible_devices=\'$DEVICE\' \
                     exp_name="$EXP_NAME" dataset="$DATASET" trainer.num_clients=100 \
                     split.mode="$SPLIT_MODE" split.alpha="$ALPHA" trainer.participation_rate=0.05 \
