@@ -227,3 +227,18 @@ class ServerDyn(Server):
             self.global_momentum[param_key] -= self.args.client.Dyn.alpha / self.args.trainer.num_clients * sum(local_deltas[param_key])
             local_weights[param_key] = sum(local_weights[param_key])/C - 1/self.args.client.Dyn.alpha * self.global_momentum[param_key]
         return local_weights
+    
+
+@SERVER_REGISTRY.register()
+class ServerMix(Server):
+    def __init__(self, args):
+        super().__init__(args)
+        self.global_mashed_data = []
+
+    def collect_mashed_data(self, client_mashed_data):
+        self.global_mashed_data.extend(client_mashed_data)
+        return self.global_mashed_data
+
+    # def broadcast_mashed_data(self):
+        # max_samples = getattr(self.args.client.FedMix, "max_mashed", 128) # 샘플수 제한시
+        # return random.sample(self.global_mashed_data, min(len(self.global_mashed_data), max_samples))

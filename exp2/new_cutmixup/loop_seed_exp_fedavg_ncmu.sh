@@ -1,11 +1,11 @@
 #!/bin/bash
 
 data_sets=(cifar10)
-alpha_values=(0.1)
-seeds=(1 2 3 4 5)
+alpha_values=(0.3)
+seeds=(4 5 6)
 CM_PROB=0.15
 MU_PROB=0.15
-DEVICE=1
+DEVICE=0
 
 for seed in "${seeds[@]}"; do
     if [ $seed = 1 ]; then
@@ -18,6 +18,8 @@ for seed in "${seeds[@]}"; do
         seed=4
     elif [ $seed = 5 ]; then
         seed=5
+    elif [ $seed = 6 ]; then
+        seed=6
     else
         echo "Unknown seed: $seed"
         exit 1
@@ -40,7 +42,7 @@ for seed in "${seeds[@]}"; do
             if [ "$SPLIT_MODE" = "iid" ]; then
                 # For iid mode, no need to iterate over alpha
                 ALPHA=0.6
-                EXP_NAME=FedAvg_ncmu"$CM_PROB"_"$MU_PROB"_iid_num1_"$seed"
+                EXP_NAME=FedAvg_ncmu"$CM_PROB"_"$MU_PROB"_iid_num1_seed"$seed"_A6000
                 python3 federated_train.py client=base server=base visible_devices=\'$DEVICE\' \
                     exp_name="$EXP_NAME" dataset="$DATASET" trainer.num_clients=100 \
                     split.mode="$SPLIT_MODE" trainer.participation_rate=0.05 \
@@ -50,7 +52,7 @@ for seed in "${seeds[@]}"; do
             else
                 # For non-iid mode, iterate over alpha values
                 for ALPHA in "${alpha_values[@]}"; do
-                    EXP_NAME=FedAvg_ncmu"$CM_PROB"_"$MU_PROB"_"$ALPHA"_num1_"$seed"
+                    EXP_NAME=FedAvg_ncmu"$CM_PROB"_"$MU_PROB"_"$ALPHA"_num1_seed"$seed"_A6000
                     python3 federated_train.py client=base server=base visible_devices=\'$DEVICE\' \
                         exp_name="$EXP_NAME" dataset="$DATASET" trainer.num_clients=100 \
                         split.mode="$SPLIT_MODE" split.alpha="$ALPHA" trainer.participation_rate=0.05 \

@@ -1,11 +1,11 @@
 #!/bin/bash
 
-data_sets=(cifar10)
-alpha_values=(0.3)
-models=(ShuffleNet_base SqueezeNet_base)
-CM_PROB=0.1
-MU_PROB=0.1
-DEVICE=5
+data_sets=(cifar100)
+alpha_values=(0.1)
+models=(SqueezeNet_base)
+CM_PROB=0.15
+MU_PROB=0.15
+DEVICE=3
 
 for MODEL in "${models[@]}"; do
     if [ "$MODEL" = "MobileViT" ]; then
@@ -48,13 +48,13 @@ for MODEL in "${models[@]}"; do
             else
                 # For non-iid mode, iterate over alpha values
                 for ALPHA in "${alpha_values[@]}"; do
-                    EXP_NAME=FedAvg_"$MODEL_NAME"_ncmu"$CM_PROB"_"$MU_PROB"_"$ALPHA"
+                    EXP_NAME=FedAvg_"$MODEL_NAME"_ncmu"$CM_PROB"_"$MU_PROB"_"$ALPHA"_num1_A6000
                     python3 federated_train.py client=base server=base visible_devices=\'$DEVICE\' \
                         exp_name="$EXP_NAME" dataset="$DATASET" trainer.num_clients=100 \
                         split.mode="$SPLIT_MODE" split.alpha="$ALPHA" trainer.participation_rate=0.05 \
                         dataset.new_cutmixup.use=true dataset.new_cutmixup.use_reg=true \
                         dataset.new_cutmixup.cutmix_prob=$CM_PROB dataset.new_cutmixup.mixup_prob=$MU_PROB \
-                        batch_size="$BATCH_SIZE" wandb=True project="ICLR" model="$MODEL_NAME"
+                        batch_size="$BATCH_SIZE" wandb=True project="ICLR" model="$MODEL_NAME" seed=3
                 done
             fi
         done

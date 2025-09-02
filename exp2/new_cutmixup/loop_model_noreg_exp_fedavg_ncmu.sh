@@ -1,26 +1,23 @@
 #!/bin/bash
 
-data_sets=(cifar10)
+data_sets=(cifar100)
 alpha_values=(0.3)
-seeds=(4 5 6)
-MU_PROB=0.3
-DEVICE=5
+models=(SqueezeNet_base)
+CM_PROB=0.15
+MU_PROB=0.15
+DEVICE=3
 
-for seed in "${seeds[@]}"; do
-    if [ $seed = 1 ]; then
-        seed=1
-    elif [ $seed = 2 ]; then
-        seed=2
-    elif [ $seed = 3 ]; then
-        seed=3
-    elif [ $seed = 4 ]; then
-        seed=4
-    elif [ $seed = 5 ]; then
-        seed=5
-    elif [ $seed = 6 ]; then
-        seed=6
+for MODEL in "${models[@]}"; do
+    if [ "$MODEL" = "MobileViT" ]; then
+        MODEL_NAME="MobileViT"
+    elif [ "$MODEL" = "VGG9_base" ]; then
+        MODEL_NAME="VGG9_base"
+    elif [ "$MODEL" = "ShuffleNet_base" ]; then
+        MODEL_NAME="ShuffleNet_base"
+    elif [ "$MODEL" = "SqueezeNet_base" ]; then
+        MODEL_NAME="SqueezeNet_base"
     else
-        echo "Unknown seed: $seed"
+        echo "Unknown model: $MODEL"
         exit 1
     fi
 
@@ -41,21 +38,23 @@ for seed in "${seeds[@]}"; do
             if [ "$SPLIT_MODE" = "iid" ]; then
                 # For iid mode, no need to iterate over alpha
                 ALPHA=0.6
-                EXP_NAME=FedAvg_mu"$MU_PROB"_iid_num1_seed"$seed"_A6000
+                EXP_NAME=FedAvg_"$MODEL_NAME"_ncmu"$CM_PROB"_"$MU_PROB"_iid_num1
                 python3 federated_train.py client=base server=base visible_devices=\'$DEVICE\' \
                     exp_name="$EXP_NAME" dataset="$DATASET" trainer.num_clients=100 \
                     split.mode="$SPLIT_MODE" trainer.participation_rate=0.05 \
-                    dataset.mixup.use=true dataset.mixup.mixup_reg=true dataset.mixup.prob="$MU_PROB" \
-                    batch_size="$BATCH_SIZE" wandb=True project="ICLR" seed=$seed
+                    dataset.new_cutmixup.use=true dataset.new_cutmixup.use_reg=false \
+                    dataset.new_cutmixup.cutmix_prob=$CM_PROB dataset.new_cutmixup.mixup_prob=$MU_PROB \
+                    batch_size="$BATCH_SIZE" wandb=True project="ICLR" model="$MODEL_NAME"
             else
                 # For non-iid mode, iterate over alpha values
                 for ALPHA in "${alpha_values[@]}"; do
-                    EXP_NAME=FedAvg_mu"$MU_PROB"_"$ALPHA"_num1_seed"$seed"_A6000
+                    EXP_NAME=FedAvg_"$MODEL_NAME"_ncmu"$CM_PROB"_"$MU_PROB"_"$ALPHA"_num1_noreg_A6000
                     python3 federated_train.py client=base server=base visible_devices=\'$DEVICE\' \
                         exp_name="$EXP_NAME" dataset="$DATASET" trainer.num_clients=100 \
                         split.mode="$SPLIT_MODE" split.alpha="$ALPHA" trainer.participation_rate=0.05 \
-                        dataset.mixup.use=true dataset.mixup.mixup_reg=true dataset.mixup.prob="$MU_PROB" \
-                        batch_size="$BATCH_SIZE" wandb=True project="ICLR" seed=$seed
+                        dataset.new_cutmixup.use=true dataset.new_cutmixup.use_reg=false \
+                        dataset.new_cutmixup.cutmix_prob=$CM_PROB dataset.new_cutmixup.mixup_prob=$MU_PROB \
+                        batch_size="$BATCH_SIZE" wandb=True project="ICLR" model="$MODEL_NAME"
                 done
             fi
         done
