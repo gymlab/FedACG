@@ -242,3 +242,36 @@ class ServerMix(Server):
     # def broadcast_mashed_data(self):
         # max_samples = getattr(self.args.client.FedMix, "max_mashed", 128) # 샘플수 제한시
         # return random.sample(self.global_mashed_data, min(len(self.global_mashed_data), max_samples))
+        
+@SERVER_REGISTRY.register()
+class ServerFA(Server):
+
+    def __init__(self, args):
+        self.args = args
+        return
+    
+    def aggregate(self, local_weights, local_deltas, client_ids, model_dict, current_lr, epoch=None):
+        C = len(client_ids)
+        eps = 1e-12
+
+        agg = {}
+        for k, lst in local_weights.items():
+            t = torch.stack(lst, dim=0)  # [M, ...]
+            if t.is_floating_point():
+                agg[k] = t.mean(dim=0)
+            else:
+                agg[k] = model_dict[k]
+
+        for key in list(model_dict.keys()):
+            if ('running_var_mean_bmic' in key) or ('running_var_std_bmic' in key):
+                base_key = key.replace('running_var_', 'running_')  # running_mean/std_bmic 로 대응
+                if base_key not in local_weights:
+                    agg[key] = model_dict[key]
+                    continue
+
+                stack = torch.stack(local_weights[base_key], dim=0)
+                stack = stack.to(model_dict[key].device).to(model_dict[key].dtype)
+                var_ac = stack.var(dim=0, unbiased=False) + eps
+                agg[key] = var_ac
+
+        return agg

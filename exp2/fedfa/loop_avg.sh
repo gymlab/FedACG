@@ -1,8 +1,8 @@
 #!/bin/bash
 
-data_sets=(cifar100)
+data_sets=(cifar10)
 alpha_values=(0.1)
-DEVICE=3
+DEVICE=6
 
 # Iterate over datasets
 for DATASET in "${data_sets[@]}"; do
@@ -19,19 +19,19 @@ for DATASET in "${data_sets[@]}"; do
         if [ "$SPLIT_MODE" = "iid" ]; then
             # For iid mode, no need to iterate over alpha
             ALPHA=0.6
-            EXP_NAME=FedMix_iid
-            python3 federated_train.py client=Mix server=FedMix visible_devices=\'$DEVICE\' \
+            EXP_NAME=FedFA_iid
+            python3 federated_train.py client=base server=FedFA visible_devices=\'$DEVICE\' \
                 exp_name="$EXP_NAME" dataset="$DATASET" trainer.num_clients=100 \
                 split.mode="$SPLIT_MODE" trainer.participation_rate=0.05 \
-                batch_size="$BATCH_SIZE" wandb=True model=resnet18 project="ICLR"
+                batch_size="$BATCH_SIZE" wandb=True model=resnet18_FA project="ICLR"
         else
             # For non-iid mode, iterate over alpha values
             for ALPHA in "${alpha_values[@]}"; do
-                EXP_NAME=FedMix_"$ALPHA"
-                python3 federated_train.py client=Mix server=FedMix visible_devices=\'$DEVICE\' \
+                EXP_NAME=FedFA_"$ALPHA"
+                python3 federated_train.py client=base server=FedFA visible_devices=\'$DEVICE\' \
                     exp_name="$EXP_NAME" dataset="$DATASET" trainer.num_clients=100 \
                     split.mode="$SPLIT_MODE" split.alpha="$ALPHA" trainer.participation_rate=0.05 \
-                    batch_size="$BATCH_SIZE" wandb=True model=resnet18 project="ICLR"
+                    batch_size="$BATCH_SIZE" wandb=True model=resnet18_FA project="ICLR"
             done
         fi
     done

@@ -8,6 +8,7 @@ from models.resnet_MLB import *
 from models.resnet_gn import *
 from models.resnet_gnws import *
 from models.resnet_ws import *
+from models.resnet_fa import *
 from models.MobileNet import *
 from models.SqueezeNet import *
 from models.ShuffleNet import *
