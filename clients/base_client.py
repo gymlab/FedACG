@@ -23,6 +23,11 @@ from clients.build import CLIENT_REGISTRY
 
 from utils.qunat_function import AQD_update , PAQ_update, WSQ_update, HQ_update, NF_update, E2M1_update, WSQG_update, WSQLG_update
 
+from collections import defaultdict
+import torch
+import torch.nn.functional as F
+from torch import autograd
+
 
 @CLIENT_REGISTRY.register()
 class Client():
@@ -131,7 +136,12 @@ class Client():
             self.local_deltas = (kwargs['past_local_deltas'])
             self.user = kwargs['user']
             self.local_delta = copy.deepcopy(self.local_deltas[self.user])
-        
+
+        #For FedMix
+        if self.args.client.get('MAFL'):
+            self.mashed_data = kwargs['mashed_data']
+            self.mixup_ratio = kwargs['mixup_ratio']
+                
         if self.args.quantizer.name != 'none':
             if self.args.quantizer.random_bit == 'fixed_alloc' or self.args.quantizer.random_bit == 'rand_alloc':
                 self.wt_bit = kwargs['wt_bit']
@@ -333,5 +343,28 @@ class Client():
                 lg_loss += (p * local_grad.detach()).sum()
             losses["Dyn"] = - lg_loss + 0.5 * self.args.client.Dyn.alpha * prox_loss
 
+        # FedMix
+        if self.args.client.get('MAFL') and self.mashed_data is not None:
+            lam = self.mixup_ratio
+            
+            mashed_image, mashed_label = random.choice(self.mashed_data)
+            mashed_image = mashed_image.to(self.device).unsqueeze(0)
+            mashed_label = mashed_label.to(self.device).float().unsqueeze(0)
+            
+            mashed_image = mashed_image.expand(images.size(0), *mashed_image.shape[1:])
+            mashed_label = mashed_label.expand(images.size(0), mashed_label.shape[1])
+
+            scaled_images = ((1 - lam) * images).detach().requires_grad_(True)
+            logits = self.model(scaled_images)["logit"]
+
+            l1 = (1 - lam) * self.criterion(logits, labels)
+            logp = F.log_softmax(logits, dim=1)
+            l2 = lam * torch.mean(torch.sum(-mashed_label * logp, dim=1))
+            
+            grad_x = autograd.grad(outputs=l1, inputs=scaled_images,
+                                create_graph=True, retain_graph=True)[0]
+            l3 = lam * (grad_x * mashed_image).flatten(1).sum(1).mean()
+            losses["cls"] = l1 + l2 + l3
+            
         del results
         return losses

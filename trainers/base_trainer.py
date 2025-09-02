@@ -111,6 +111,27 @@ class Trainer():
         if self.args.quantizer.name == "WSQG" and self.args.quantizer.random_bit == 'fixed_alloc':
             self.local_wt_bits = np.random.choice(np.array([1, 2, 4]), size=self.args.trainer.num_clients, replace=True)
 
+
+    def _build_mafl_means(self, local_dataset, M_k: int) -> list:
+
+        num_classes = len(local_dataset.dataset.classes)
+
+        loader = DataLoader(local_dataset, batch_size=M_k, shuffle=True, num_workers=0, pin_memory=False, drop_last=True)
+
+        mashed = []
+        for imgs, labels in loader:
+            avg_img = imgs.mean(dim=0)
+            
+            one_hot = nn.functional.one_hot(labels, num_classes=num_classes).float()
+            avg_lab = one_hot.mean(dim=0)
+
+            mashed.append((avg_img, avg_lab))
+
+            # # mashed sample limit
+            # if len(mashed) >= getattr(self.args.client.FedMix, "max_mashed", 128):
+            #     break
+        return mashed
+    
     def local_update(self, device, task_queue, result_queue):
         if self.args.multiprocessing:
             torch.cuda.set_device(device)
@@ -161,6 +182,22 @@ class Trainer():
                 setup_inputs['past_local_deltas'] = self.past_local_deltas
                 setup_inputs['user'] = task['client_idx']
 
+
+            # FedMix
+            if self.args.client.get('MAFL'):
+                lam = float(getattr(self.args.client.MAFL, "lambda", 0.2))
+                M_k = int(getattr(self.args.client.MAFL, "M_k", 16))
+
+                mashed_data = self._build_mafl_means(local_dataset, M_k=M_k)
+
+                setup_inputs["mashed_data"] = mashed_data
+                setup_inputs["mixup_ratio"] = lam
+
+                global_mashed_data = self.server.collect_mashed_data(mashed_data)
+
+                # global_mashed_data = self.server.broadcast_mashed_data()  # sample 수 제한 일단 제외
+                setup_inputs["mashed_data"] = global_mashed_data
+                
             client.setup(**setup_inputs)
             # Local Training
             

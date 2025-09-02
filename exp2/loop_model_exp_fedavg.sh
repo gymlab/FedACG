@@ -1,9 +1,9 @@
 #!/bin/bash
 
-data_sets=(tinyimagenet)
-alpha_values=(0.3)
-models=(MobileViT VGG9_base ShuffleNet_base SqueezeNet_base)
-DEVICE=0
+data_sets=(cifar100)
+alpha_values=(0.1)
+models=(SqueezeNet_base)
+DEVICE=6
 
 for MODEL in "${models[@]}"; do
     if [ "$MODEL" = "MobileViT" ]; then
@@ -44,7 +44,7 @@ for MODEL in "${models[@]}"; do
             else
                 # For non-iid mode, iterate over alpha values
                 for ALPHA in "${alpha_values[@]}"; do
-                    EXP_NAME=FedAvg_"$MODEL_NAME"_"$ALPHA"_num1
+                    EXP_NAME=FedAvg_"$MODEL_NAME"_"$ALPHA"_num1_A6000
                     python3 federated_train.py client=base server=base visible_devices=\'$DEVICE\' \
                         exp_name="$EXP_NAME" dataset="$DATASET" trainer.num_clients=100 \
                         split.mode="$SPLIT_MODE" split.alpha="$ALPHA" trainer.participation_rate=0.05 \
