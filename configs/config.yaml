@@ -54,10 +54,10 @@ analysis: False
 defaults:
   - _self_
   - trainer: base
-  - client: Mix
+  - client: base
   - evaler: base
   - dataset: cifar10
-  - server: FedMix
+  - server: base
   - model: resnet18
   - quantizer: base
   # - override hydra/job_logging: colorlog_custom
