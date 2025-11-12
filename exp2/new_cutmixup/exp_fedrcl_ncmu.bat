@@ -18,12 +18,10 @@ if "%DATASET%"=="tinyimagenet" (
 
 python federated_train.py client=fedrcl server=base ^
     visible_devices='%CUDA_VISIBLE_DEVICES%' ^
-    exp_name="FedRCL_ncmu%CM_PROB%_%MU_PROB%_%ALPHA%_num1" ^
+    exp_name="FedRCL_ncmu%CM_PROB%_%MU_PROB%_%ALPHA%" ^
     dataset=%DATASET% ^
     trainer.num_clients=100 ^
     split.alpha=%ALPHA% ^
-    split.mode=iid ^
-    seed=3 ^
     trainer.participation_rate=0.05 ^
     batch_size=!BATCH_SIZE! ^
     wandb=True ^
