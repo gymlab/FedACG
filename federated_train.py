@@ -21,7 +21,7 @@ import omegaconf
 import logging
 logger = logging.getLogger(__name__)
 
-wandb.require("service")
+# wandb.require("service")
 
 @hydra.main(version_base=None, config_path="configs", config_name="config") # load configs/config.yaml as args
 def main(args : DictConfig) -> None:

@@ -9,6 +9,7 @@ from typing import List, Dict
 import copy
 import json
 from collections import OrderedDict
+from tqdm import tqdm
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -203,8 +204,53 @@ def get_dataset(args, trainset, mode='iid'):
 
             except:
                 print("Fail to write client data at " + directory)
+                
+        stats_registry = []
+        
+        if args.client.RDN.use == True:
+            print("Computing statistics for FedRDN")
+            
+            sorted_client_ids = sorted(dataset.keys())
+            
+            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            
+            for client_id in tqdm(sorted_client_ids, desc="Processing Clients"):
 
-        return dataset
+                client_indices = list(dataset[client_id])
+                subset = torch.utils.data.Subset(trainset, client_indices)
+                
+                temp_loader = torch.utils.data.DataLoader(
+                    subset, 
+                    batch_size=256, 
+                    shuffle=False, 
+                    num_workers=0,
+                    pin_memory=True if torch.cuda.is_available() else False
+                )
+                
+                channel_mean = torch.zeros(3).to(device)
+                channel_std = torch.zeros(3).to(device)
+                n_samples = 0.
+                
+                with torch.no_grad():
+                    for data, _ in temp_loader:
+                        data = data.to(device, non_blocking=True)
+                        
+                        N, C, H, W = data.shape
+                        data = data.view(N, C, -1)
+                        
+                        channel_mean += data.mean(2).sum(0)
+                        channel_std += data.std(2).sum(0)
+                        n_samples += N
+                
+                if n_samples > 0:
+                    channel_mean /= n_samples
+                    channel_std /= n_samples
+                
+                stats_registry.append((channel_mean.cpu(), channel_std.cpu()))
+
+            print("FedRDN statistics computation finished.")
+            
+        return dataset, stats_registry
     elif 'leaf' in set:
         return trainset.get_train_idxs()
     elif set == 'shakespeare':

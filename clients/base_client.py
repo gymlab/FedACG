@@ -56,7 +56,7 @@ class Client():
             train_sampler = RandomClasswiseSampler(local_dataset, num_instances=self.args.dataset.num_instances)   
         else:
             train_sampler = None
-        
+            
         if self.args.dataset.cutmix.use == True:
             local_dataset = CutMix(local_dataset, 
                                    num_classes=len(local_dataset.dataset.classes), 
@@ -142,7 +142,10 @@ class Client():
         if self.args.client.get('MAFL'):
             self.mashed_data = kwargs['mashed_data']
             self.mixup_ratio = kwargs['mixup_ratio']
-                
+            
+        if self.args.client.RDN.use == True:
+            self.stats = kwargs['stats']
+                            
         if self.args.quantizer.name != 'none':
             if self.args.quantizer.random_bit == 'fixed_alloc' or self.args.quantizer.random_bit == 'rand_alloc':
                 self.wt_bit = kwargs['wt_bit']
@@ -205,7 +208,17 @@ class Client():
             end = time.time()
 
             for i, (images, labels) in enumerate(self.loader):
+                
+                if self.args.client.RDN.use == True:
+                    random_stats = random.choice(self.stats)
+                    mean = random_stats[0]
+                    std = random_stats[1]
+                                        
+                    mean = mean.view(1, 3, 1, 1)
+                    std  = std.view(1, 3, 1, 1)
                     
+                    images = (images - mean) / std
+
                 images, labels = images.to(self.device), labels.to(self.device)
                 self.model.zero_grad(set_to_none=True)
 

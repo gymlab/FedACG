@@ -81,7 +81,7 @@ class Trainer():
             self.server.set_momentum(self.model)
 
         self.datasets = datasets
-        self.local_dataset_split_ids = get_dataset(self.args, self.datasets['train'], mode=self.args.split.mode)
+        self.local_dataset_split_ids, self.stats = get_dataset(self.args, self.datasets['train'], mode=self.args.split.mode)
 
         test_loader = DataLoader(self.datasets["test"],
                                 batch_size=args.evaler.batch_size if args.evaler.batch_size > 0 else args.batch_size,
@@ -197,7 +197,10 @@ class Trainer():
 
                 # global_mashed_data = self.server.broadcast_mashed_data()  # sample 수 제한 일단 제외
                 setup_inputs["mashed_data"] = global_mashed_data
-                
+
+            if self.args.client.RDN.use == True:
+                setup_inputs["stats"] = self.stats
+
             client.setup(**setup_inputs)
             # Local Training
             
