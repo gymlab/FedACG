@@ -9,6 +9,7 @@ from typing import List, Dict
 import copy
 import json
 from collections import OrderedDict
+from tqdm import tqdm
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -203,8 +204,53 @@ def get_dataset(args, trainset, mode='iid'):
 
             except:
                 print("Fail to write client data at " + directory)
+                
+        stats_registry = []
+        
+        if "RDN" in args.client and args.client.RDN.use:
+            print("Computing statistics for FedRDN")
+            
+            sorted_client_ids = sorted(dataset.keys())
+            
+            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            
+            for client_id in tqdm(sorted_client_ids, desc="Processing Clients"):
 
-        return dataset
+                client_indices = list(dataset[client_id])
+                subset = torch.utils.data.Subset(trainset, client_indices)
+                
+                temp_loader = torch.utils.data.DataLoader(
+                    subset, 
+                    batch_size=256, 
+                    shuffle=False, 
+                    num_workers=0,
+                    pin_memory=True if torch.cuda.is_available() else False
+                )
+                
+                channel_mean = torch.zeros(3).to(device)
+                channel_std = torch.zeros(3).to(device)
+                n_samples = 0.
+                
+                with torch.no_grad():
+                    for data, _ in temp_loader:
+                        data = data.to(device, non_blocking=True)
+                        
+                        N, C, H, W = data.shape
+                        data = data.view(N, C, -1)
+                        
+                        channel_mean += data.mean(2).sum(0)
+                        channel_std += data.std(2).sum(0)
+                        n_samples += N
+                
+                if n_samples > 0:
+                    channel_mean /= n_samples
+                    channel_std /= n_samples
+                
+                stats_registry.append((channel_mean.cpu(), channel_std.cpu()))
+
+            print("FedRDN statistics computation finished.")
+            
+        return dataset, stats_registry
     elif 'leaf' in set:
         return trainset.get_train_idxs()
     elif set == 'shakespeare':
@@ -573,7 +619,7 @@ class NEWCutMixup(DatasetSplitSubset):
     def __init__(self, dataset, num_classes,
                  cutmix_prob=1.0, cutmix_beta=1.0,
                  mixup_prob=1.0, mixup_beta=1.0,
-                 use_reg=False):
+                 use_reg=False, sigma=1.0):
         self.dataset = dataset.dataset
         self.subset_classes = dataset.subset_classes
 
@@ -588,6 +634,8 @@ class NEWCutMixup(DatasetSplitSubset):
         self.mixup_beta = mixup_beta
 
         self.use_reg = use_reg
+        self.sigma = sigma
+        
         if use_reg:
             self.probs = self.compute_sampling_probs()
 
@@ -639,7 +687,8 @@ class NEWCutMixup(DatasetSplitSubset):
     def compute_sampling_probs(self):
         label_list = [self.dataset[idx][-1] for idx in self.indices]
         class_counts = torch.tensor([self.class_dict[str(label)] for label in label_list])
-        weights = 1. / (class_counts + 1e-6)
+        # weights = 1. / (class_counts + 1e-6)
+        weights = (class_counts + 1e-6).pow(-self.sigma)
         probs = weights / weights.sum()
         return probs
     
