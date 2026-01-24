@@ -142,8 +142,8 @@ class Client():
         if self.args.client.get('MAFL'):
             self.mashed_data = kwargs['mashed_data']
             self.mixup_ratio = kwargs['mixup_ratio']
-            
-        if self.args.client.RDN.use == True:
+
+        if "RDN" in self.args.client and self.args.client.RDN.use:
             self.stats = kwargs['stats']
                             
         if self.args.quantizer.name != 'none':
@@ -209,7 +209,7 @@ class Client():
 
             for i, (images, labels) in enumerate(self.loader):
                 
-                if self.args.client.RDN.use == True:
+                if "RDN" in self.args.client and self.args.client.RDN.use:
                     random_stats = random.choice(self.stats)
                     mean = random_stats[0]
                     std = random_stats[1]

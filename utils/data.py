@@ -207,7 +207,7 @@ def get_dataset(args, trainset, mode='iid'):
                 
         stats_registry = []
         
-        if args.client.RDN.use == True:
+        if "RDN" in args.client and args.client.RDN.use:
             print("Computing statistics for FedRDN")
             
             sorted_client_ids = sorted(dataset.keys())

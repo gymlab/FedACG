@@ -6,7 +6,7 @@ sigma_values=(-0.5 0 0.5)
 seeds=(0)
 CM_PROB=0.15
 MU_PROB=0.15
-DEVICE=3
+DEVICE=1
 
 
 
@@ -42,7 +42,7 @@ for seed in "${seeds[@]}"; do
         fi
 
         # Iterate over split modes
-        for SPLIT_MODE in "iid"; do
+        for SPLIT_MODE in "dirichlet" "iid"; do
     
             if [ "$SPLIT_MODE" = "iid" ]; then
                 for sigma in "${sigma_values[@]}"; do       

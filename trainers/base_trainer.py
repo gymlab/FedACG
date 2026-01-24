@@ -198,7 +198,7 @@ class Trainer():
                 # global_mashed_data = self.server.broadcast_mashed_data()  # sample 수 제한 일단 제외
                 setup_inputs["mashed_data"] = global_mashed_data
 
-            if self.args.client.RDN.use == True:
+            if "RDN" in self.args.client and self.args.client.RDN.use:
                 setup_inputs["stats"] = self.stats
 
             client.setup(**setup_inputs)
