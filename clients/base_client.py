@@ -98,7 +98,8 @@ class Client():
                                    cutmix_prob=self.args.dataset.new_cutmixup.cutmix_prob,
                                    mixup_beta=self.args.dataset.new_cutmixup.mixup_beta,
                                    mixup_prob=self.args.dataset.new_cutmixup.mixup_prob,
-                                   use_reg=self.args.dataset.new_cutmixup.use_reg)
+                                   use_reg=self.args.dataset.new_cutmixup.use_reg,
+                                   sigma=self.args.dataset.new_cutmixup.sigma)
 
         self.loader =  DataLoader(local_dataset, batch_size=self.args.batch_size, sampler=train_sampler, shuffle=train_sampler is None,
                                    num_workers=self.args.num_workers, pin_memory=self.args.pin_memory)

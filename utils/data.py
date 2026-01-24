@@ -578,7 +578,7 @@ class NEWCutMixup(DatasetSplitSubset):
     def __init__(self, dataset, num_classes,
                  cutmix_prob=1.0, cutmix_beta=1.0,
                  mixup_prob=1.0, mixup_beta=1.0,
-                 use_reg=False):
+                 use_reg=False, sigma=1.0):
         self.dataset = dataset.dataset
         self.subset_classes = dataset.subset_classes
 
@@ -593,6 +593,8 @@ class NEWCutMixup(DatasetSplitSubset):
         self.mixup_beta = mixup_beta
 
         self.use_reg = use_reg
+        self.sigma = sigma
+        
         if use_reg:
             self.probs = self.compute_sampling_probs()
 
@@ -644,7 +646,8 @@ class NEWCutMixup(DatasetSplitSubset):
     def compute_sampling_probs(self):
         label_list = [self.dataset[idx][-1] for idx in self.indices]
         class_counts = torch.tensor([self.class_dict[str(label)] for label in label_list])
-        weights = 1. / (class_counts + 1e-6)
+        # weights = 1. / (class_counts + 1e-6)
+        weights = (class_counts + 1e-6).pow(-self.sigma)
         probs = weights / weights.sum()
         return probs
     
