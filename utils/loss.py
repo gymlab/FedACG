@@ -11,11 +11,19 @@ __all__ = ['FedLC', 'FedDecorrLoss','KD', 'MultiLabelCrossEntropyLoss', 'CLLoss'
 def FedLC(label_distrib, logit, y, tau):
     cal_logit = torch.exp(logit- (tau* torch.pow(label_distrib, -1 / 4).unsqueeze(0).expand((logit.shape[0], -1))))
     #breakpoint()
-    y_logit = torch.gather(cal_logit, dim=-1, index=y.unsqueeze(1))
+    if y.dim() == 1:
+        
+        y_logit = torch.gather(cal_logit, dim=-1, index=y.unsqueeze(1))
+        
+    else:
+        y_logit = (y * cal_logit).sum(dim=-1, keepdim=True)
+        
     sum_y_logit = cal_logit.sum(dim=-1, keepdim=True)
     #loss = -torch.log(y_logit / (sum_y_logit - y_logit))
     loss = -torch.log(y_logit / (sum_y_logit))
     return loss.sum() / logit.shape[0]
+
+
 
 
 class FedDecorrLoss(nn.Module):
