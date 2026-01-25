@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 from clients.build import CLIENT_REGISTRY
 
-from utils.qunat_function import AQD_update , PAQ_update, WSQ_update, HQ_update, NF_update, E2M1_update, WSQG_update, WSQLG_update
+from utils.qunat_function import AQD_update, PAQ_update, WSQ_update, HQ_update, NF_update, E2M1_update, WSQG_update, WSQLG_update
 
 from collections import defaultdict
 import torch
@@ -300,7 +300,7 @@ class Client():
         losses = defaultdict(float)
 
         results = self.model(images)
-        cls_loss = self.criterion(results["logit"], labels)
+        cls_loss = self.criterion(results["logit"], labels) 
         losses["cls"] = cls_loss
         ## Weight L2 loss
         if self.args.client.get('prox_loss'):

@@ -41,7 +41,7 @@ cutout:
 
 # cutmixup param.
 new_cutmixup:
-  use: True
+  use: False
   cutmix_beta: 1
   cutmix_prob: 0.1
   mixup_beta: 1
