@@ -47,4 +47,4 @@ new_cutmixup:
   mixup_beta: 1
   mixup_prob: 0.1
   use_reg: True
-  sigma: 0.5
+  sigma: 1

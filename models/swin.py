@@ -223,7 +223,7 @@ class StageModule(nn.Module):
 
 
 class SwinTransformer(nn.Module):
-    def __init__(self, *, hidden_dim, layers, heads, channels=3, num_classes=100, head_dim=32, window_size=4,
+    def __init__(self, *, hidden_dim, layers, heads, channels=3, num_classes=200, head_dim=32, window_size=4,
                  downscaling_factors=(4, 2, 2, 2), relative_pos_embedding=True, drop_prob=0.2):
         super().__init__()
         self.num_layers = 4
@@ -268,7 +268,11 @@ class SwinTransformer(nn.Module):
     
 @ENCODER_REGISTRY.register()
 class Swin(SwinTransformer):    
-    def __init__(self, args: DictConfig, num_classes: int = 10, **kwargs):
+    def __init__(self, args: DictConfig, num_classes: int = 200, **kwargs):
         super().__init__(hidden_dim=96, layers=(2, 2, 6, 2), heads=(3, 6, 12, 24),
-                         downscaling_factors=(2,2,2,1), drop_prob=args.model.drop_prob)
+                         downscaling_factors=(4, 2, 2, 1), drop_prob=args.model.drop_prob)
 
+    # cifar
+    # def __init__(self, args: DictConfig, num_classes: int = 10, **kwargs):
+    #     super().__init__(hidden_dim=96, layers=(2, 2, 6, 2), heads=(3, 6, 12, 24),
+    #                      downscaling_factors=(2,2,2,1), drop_prob=args.model.drop_prob)
