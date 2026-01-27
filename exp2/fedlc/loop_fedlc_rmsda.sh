@@ -1,8 +1,8 @@
 #!/bin/bash
 
-data_sets=(cifar100)
+data_sets=(cifar10 tinyimagenet)
 alpha_values=(0.6)
-seeds=(1 2 3 4)
+seeds=(3)
 CM_PROB=0.15
 MU_PROB=0.15
 DEVICE=4

@@ -1,9 +1,8 @@
 #!/bin/bash
 
-data_sets=(tinyimagenet)
+data_sets=(cifar100)
 alpha_values=(0.3)
-DEVICE=0
-DROPS=(0.2 0.1)
+DEVICE=3
 
 # Iterate over datasets
 for DATASET in "${data_sets[@]}"; do
@@ -14,28 +13,26 @@ for DATASET in "${data_sets[@]}"; do
         BATCH_SIZE=50
     fi
 
-    for DROP in "${DROPS[@]}"; do
-        # Iterate over split modes
-        for SPLIT_MODE in "dirichlet"; do
+    # Iterate over split modes
+    for SPLIT_MODE in "dirichlet"; do
 
-            if [ "$SPLIT_MODE" = "iid" ]; then
-                # For iid mode, no need to iterate over alpha
-                ALPHA=0.6
-                EXP_NAME=FedAvg_iid_Swin_D"$DROP"
+        if [ "$SPLIT_MODE" = "iid" ]; then
+            # For iid mode, no need to iterate over alpha
+            ALPHA=0.6
+            EXP_NAME=FedAvg_iid_ConvMixer
+            python federated_train.py client=base server=base visible_devices=\'$DEVICE\' \
+                exp_name="$EXP_NAME" dataset="$DATASET" trainer.num_clients=100 \
+                split.mode="$SPLIT_MODE" trainer.participation_rate=0.05 \
+                batch_size="$BATCH_SIZE" wandb=True model=ConvMixer project="CVPR_REBUTTAL"
+        else
+            # For non-iid mode, iterate over alpha values
+            for ALPHA in "${alpha_values[@]}"; do
+                EXP_NAME=FedAvg_"$ALPHA"_ConvMixer
                 python federated_train.py client=base server=base visible_devices=\'$DEVICE\' \
                     exp_name="$EXP_NAME" dataset="$DATASET" trainer.num_clients=100 \
-                    split.mode="$SPLIT_MODE" trainer.participation_rate=0.05 model.drop_prob="$DROP" \
-                    batch_size="$BATCH_SIZE" wandb=True model=Swin project="CVPR_REBUTTAL"
-            else
-                # For non-iid mode, iterate over alpha values
-                for ALPHA in "${alpha_values[@]}"; do
-                    EXP_NAME=FedAvg_"$ALPHA"_Swin_D"$DROP"
-                    python federated_train.py client=base server=base visible_devices=\'$DEVICE\' \
-                        exp_name="$EXP_NAME" dataset="$DATASET" trainer.num_clients=100 \
-                        split.mode="$SPLIT_MODE" split.alpha="$ALPHA" trainer.participation_rate=0.05 model.drop_prob="$DROP" \
-                        batch_size="$BATCH_SIZE" wandb=True model=Swin project="CVPR_REBUTTAL"
-                done
-            fi
-        done
+                    split.mode="$SPLIT_MODE" split.alpha="$ALPHA" trainer.participation_rate=0.05 \
+                    batch_size="$BATCH_SIZE" wandb=True model=ConvMixer project="CVPR_REBUTTAL"
+            done
+        fi
     done
 done

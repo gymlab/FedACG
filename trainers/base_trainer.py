@@ -255,7 +255,9 @@ class Trainer():
             local_weights = defaultdict(list)
             local_loss_dicts = defaultdict(list)
             local_deltas = defaultdict(list)
-
+            
+            local_models = []
+            
             # FedACG lookahead momentum
             if self.args.server.get('FedACG'):
                 assert(self.args.server.momentum > 0)
@@ -282,7 +284,9 @@ class Trainer():
                     local_state_dict, local_loss_dict = result_queue.get()
                     for loss_key in local_loss_dict:
                         local_loss_dicts[loss_key].append(local_loss_dict[loss_key])
-
+                        
+                    local_models.append(local_state_dict)
+                    
                     for param_key in local_state_dict:
                         local_weights[param_key].append(local_state_dict[param_key])
                         local_deltas[param_key].append(local_state_dict[param_key] - global_state_dict[param_key])
@@ -294,14 +298,20 @@ class Trainer():
                     local_state_dict, local_loss_dict = result
                     for loss_key in local_loss_dict:
                         local_loss_dicts[loss_key].append(local_loss_dict[loss_key])
-
+                        
+                    local_models.append(local_state_dict)
+                    
                     # If you want to save gpu memory, make sure that weights are not allocated to GPU
                     for param_key in local_state_dict:
                         local_weights[param_key].append(local_state_dict[param_key])
                         local_deltas[param_key].append(local_state_dict[param_key] - global_state_dict[param_key])
             
             logger.info(f"Global epoch {epoch}, Train End. Total Time: {time.time() - start:.2f}s")
-
+            
+            if ((epoch + 1) % 50 == 0 or epoch == 0):
+                local_acc = self.local_evaluate(local_models, epoch)
+                logger.info(local_acc)
+                
             if self.args.quantizer.name == 'HQ':
                 q_list = [self.client_errors[cid] for cid in selected_client_ids]
                 p_list = compute_p_i(q_list)  
@@ -309,7 +319,7 @@ class Trainer():
                     for i, w_i in enumerate(local_weights[param_key]):
                         local_weights[param_key][i] = p_list[i] * w_i * len(selected_client_ids)
                         
-            updated_global_state_dict = self.server.aggregate(local_weights, local_deltas,
+            updated_global_state_dict, grad_var = self.server.aggregate(local_weights, local_deltas,
                                                             selected_client_ids, copy.deepcopy(global_state_dict), current_lr, 
                                                             epoch=epoch if self.args.server.get('AnalizeServer') else None)
 
@@ -327,6 +337,7 @@ class Trainer():
             # Logging
             wandb_dict = {loss_key: np.mean(local_loss_dicts[loss_key]) for loss_key in local_loss_dicts}
             wandb_dict['lr'] = self.lr
+            wandb_dict['grad_var'] = grad_var
 
             self.wandb_log(wandb_dict, step=epoch)
 
@@ -399,7 +410,26 @@ class Trainer():
         return {
             "acc": acc
         }
+        
+    def local_evaluate(self, local_models: list, epoch: int) -> Dict:
+        local_acc = {}
+        local_model_list = [copy.deepcopy(self.model) for _ in range(len(local_models))]
+        for i, state_dict in enumerate(local_models):
+            local_model_list[i].load_state_dict(state_dict)
+            rst = self.evaler.eval(model=local_model_list[i], epoch=epoch)
+            local_acc[i] = rst["acc"]
+            # logger.warning(f'[Epoch {epoch}] local Test Accuracy: {local_acc[i]:.2f}%')
+        
+        wandb_dict = {
+            f"local_acc/{self.args.dataset.name}/": local_acc,
+            }
 
+        plt.close()
+        
+        self.wandb_log(wandb_dict, step=epoch)
+        return {
+            "local_acc": local_acc
+        }
 
 @TRAINER_REGISTRY.register()
 class CKATrainer(Trainer):

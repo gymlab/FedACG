@@ -1,10 +1,10 @@
 #!/bin/bash
 
-data_sets=(cifar100)
-alpha_values=(0.3)
-seeds=(1 2 3 4)
+data_sets=(cifar10)
+alpha_values=(0.6)
+seeds=(3)
 MU_PROB=0.3
-DEVICE=6
+DEVICE=3
 
 for seed in "${seeds[@]}"; do
     if [ $seed = 1 ]; then
@@ -38,7 +38,7 @@ for seed in "${seeds[@]}"; do
         fi
 
         # Iterate over split modes
-        for SPLIT_MODE in "dirichlet"; do
+        for SPLIT_MODE in "iid"; do
     
             if [ "$SPLIT_MODE" = "iid" ]; then
                 # For iid mode, no need to iterate over alpha
