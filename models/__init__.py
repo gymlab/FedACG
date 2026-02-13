@@ -23,5 +23,6 @@ from models.resnet_won import *
 from models.mobilevit import *
 from models.mobilevitWS import *
 from models.swin import *
+from models.DeiT import *
 
 from models.build import build_encoder

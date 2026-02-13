@@ -86,6 +86,7 @@ class Trainer():
         test_loader = DataLoader(self.datasets["test"],
                                 batch_size=args.evaler.batch_size if args.evaler.batch_size > 0 else args.batch_size,
                                 shuffle=False, num_workers=args.num_workers)
+
         eval_device = self.device if not self.args.multiprocessing else torch.device(f'cuda:{self.args.main_gpu}')
         eval_params = {
             "test_loader": test_loader,
@@ -182,7 +183,6 @@ class Trainer():
                 setup_inputs['past_local_deltas'] = self.past_local_deltas
                 setup_inputs['user'] = task['client_idx']
 
-
             # FedMix
             if self.args.client.get('MAFL'):
                 lam = float(getattr(self.args.client.MAFL, "lambda", 0.2))
@@ -199,8 +199,12 @@ class Trainer():
                 setup_inputs["mashed_data"] = global_mashed_data
 
             if "RDN" in self.args.client and self.args.client.RDN.use:
-                setup_inputs["stats"] = self.stats
-
+                # selected_stats = []
+                # for i in task['selected_client_ids']:
+                #     selected_stats.append(self.stats[i])
+                # setup_inputs["stats"] = selected_stats
+                setup_inputs["full_stats"] = self.stats
+            
             client.setup(**setup_inputs)
             # Local Training
             
@@ -256,6 +260,8 @@ class Trainer():
             local_loss_dicts = defaultdict(list)
             local_deltas = defaultdict(list)
 
+            local_models = []
+            
             # FedACG lookahead momentum
             if self.args.server.get('FedACG'):
                 assert(self.args.server.momentum > 0)
@@ -270,6 +276,7 @@ class Trainer():
                     'client_idx': client_idx,
                     'local_lr': current_lr,
                     'global_epoch': epoch,
+                    'selected_client_ids': selected_client_ids,
                 }
                 
                 if self.args.multiprocessing:
@@ -283,10 +290,13 @@ class Trainer():
                     for loss_key in local_loss_dict:
                         local_loss_dicts[loss_key].append(local_loss_dict[loss_key])
 
+                    local_models.append(local_state_dict)
+                    
                     for param_key in local_state_dict:
                         local_weights[param_key].append(local_state_dict[param_key])
                         local_deltas[param_key].append(local_state_dict[param_key] - global_state_dict[param_key])
 
+                        
             if self.args.multiprocessing:
                 for _ in range(len(selected_client_ids)):
                     # Retrieve results from the queue
@@ -295,13 +305,20 @@ class Trainer():
                     for loss_key in local_loss_dict:
                         local_loss_dicts[loss_key].append(local_loss_dict[loss_key])
 
+                    local_models.append(local_state_dict)
+                    
                     # If you want to save gpu memory, make sure that weights are not allocated to GPU
                     for param_key in local_state_dict:
                         local_weights[param_key].append(local_state_dict[param_key])
                         local_deltas[param_key].append(local_state_dict[param_key] - global_state_dict[param_key])
+                    
             
             logger.info(f"Global epoch {epoch}, Train End. Total Time: {time.time() - start:.2f}s")
-
+            
+            # if ((epoch + 1) % 50 == 0 or epoch == 0):
+            #     local_acc = self.local_evaluate(local_models, epoch, selected_client_ids)
+            #     logger.info(local_acc)
+                
             if self.args.quantizer.name == 'HQ':
                 q_list = [self.client_errors[cid] for cid in selected_client_ids]
                 p_list = compute_p_i(q_list)  
@@ -309,7 +326,7 @@ class Trainer():
                     for i, w_i in enumerate(local_weights[param_key]):
                         local_weights[param_key][i] = p_list[i] * w_i * len(selected_client_ids)
                         
-            updated_global_state_dict = self.server.aggregate(local_weights, local_deltas,
+            updated_global_state_dict, grad_var = self.server.aggregate(local_weights, local_deltas,
                                                             selected_client_ids, copy.deepcopy(global_state_dict), current_lr, 
                                                             epoch=epoch if self.args.server.get('AnalizeServer') else None)
 
@@ -319,7 +336,7 @@ class Trainer():
                 self.model.update_all_global_std(self.args.quantizer.momentum)
 
             if self.args.eval.freq > 0 and epoch % self.args.eval.freq == 0:
-                self.evaluate(epoch=epoch)
+                self.evaluate(epoch=epoch, selected_client_ids=selected_client_ids)
 
             if (self.args.save_freq > 0 and (epoch + 1) % self.args.save_freq == 0) or (epoch + 1 == self.args.trainer.global_rounds):
                 self.save_model(epoch=epoch)
@@ -327,6 +344,7 @@ class Trainer():
             # Logging
             wandb_dict = {loss_key: np.mean(local_loss_dicts[loss_key]) for loss_key in local_loss_dicts}
             wandb_dict['lr'] = self.lr
+            wandb_dict['grad_var'] = grad_var
 
             self.wandb_log(wandb_dict, step=epoch)
 
@@ -382,9 +400,10 @@ class Trainer():
     def validate(self, epoch: int, ) -> Dict:
         return
 
-    def evaluate(self, epoch: int) -> Dict:
-
-        results = self.evaler.eval(model=copy.deepcopy(self.model), epoch=epoch)
+    def evaluate(self, epoch: int, selected_client_ids: list = None) -> Dict:
+        
+        results = self.evaler.eval(model=copy.deepcopy(self.model), epoch=epoch
+                                   ,selected_client_ids=selected_client_ids)
         acc = results["acc"]
 
         wandb_dict = {
@@ -398,6 +417,26 @@ class Trainer():
         self.wandb_log(wandb_dict, step=epoch)
         return {
             "acc": acc
+        }
+        
+    def local_evaluate(self, local_models: list, epoch: int) -> Dict:
+        local_acc = {}
+        local_model_list = [copy.deepcopy(self.model) for _ in range(len(local_models))]
+        for i, state_dict in enumerate(local_models):
+            local_model_list[i].load_state_dict(state_dict)
+            rst = self.evaler.eval(model=local_model_list[i], epoch=epoch)
+            local_acc[i] = rst["acc"]
+            # logger.warning(f'[Epoch {epoch}] local Test Accuracy: {local_acc[i]:.2f}%')
+        
+        wandb_dict = {
+            f"local_acc/{self.args.dataset.name}/": local_acc,
+            }
+
+        plt.close()
+        
+        self.wandb_log(wandb_dict, step=epoch)
+        return {
+            "local_acc": local_acc
         }
 
 

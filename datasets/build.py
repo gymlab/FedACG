@@ -31,19 +31,55 @@ def get_transform(args, train, config):
         normalize = transforms.Normalize(config['mean'],
                                          config['std'])
         imsize = config['imsize']
-        if train:
-            transform = transforms.Compose(
-                [transforms.RandomRotation(10),
-                 transforms.RandomCrop(imsize, padding=4),
-                 transforms.RandomHorizontalFlip(),
-                 transforms.ToTensor(),
-                 normalize
-                 ])
+        
+        if "DeiT" in args.model.name and "CIFAR" in args.dataset.name:
+            tim_size = 224
+            if train:
+                transform = transforms.Compose(
+                    [transforms.RandomRotation(10),
+                    transforms.RandomCrop(imsize, padding=4),
+                    transforms.RandomHorizontalFlip(),
+                    transforms.Resize((tim_size, tim_size), interpolation=transforms.InterpolationMode.BICUBIC),
+                    transforms.ToTensor(),
+                    normalize
+                    ])
+            else:
+                transform = transforms.Compose(
+                    [transforms.Resize((tim_size, tim_size), interpolation=transforms.InterpolationMode.BICUBIC),
+                    transforms.ToTensor(),
+                    normalize])
+                
         else:
-            transform = transforms.Compose(
-                [transforms.CenterCrop(imsize),
-                 transforms.ToTensor(),
-                 normalize])
+            
+        
+            if "RDN" in args.client and args.client.RDN.use:
+                
+                if train:
+                    transform = transforms.Compose(
+                        [transforms.RandomRotation(10),
+                        transforms.RandomCrop(imsize, padding=4),
+                        transforms.RandomHorizontalFlip(),
+                        transforms.ToTensor(),
+                        ])
+                else:
+                    transform = transforms.Compose(
+                        [transforms.CenterCrop(imsize),
+                        transforms.ToTensor(),
+                        normalize])
+            else:
+                if train:
+                    transform = transforms.Compose(
+                        [transforms.RandomRotation(10),
+                        transforms.RandomCrop(imsize, padding=4),
+                        transforms.RandomHorizontalFlip(),
+                        transforms.ToTensor(),
+                        normalize
+                        ])
+                else:
+                    transform = transforms.Compose(
+                        [transforms.CenterCrop(imsize),
+                        transforms.ToTensor(),
+                        normalize])
 
     return transform
 

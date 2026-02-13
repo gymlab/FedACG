@@ -60,8 +60,8 @@ class Evaler():
         self.gallery_loader = gallery_loader
         self.query_loader = query_loader
         self.criterion = nn.CrossEntropyLoss(reduction = 'none')
-
-
+        
+        
     @torch.no_grad()
     def eval(self, model: nn.Module, epoch: int, device: torch.device = None, **kwargs) -> Dict:
 
@@ -71,7 +71,7 @@ class Evaler():
             device = self.device
         model.to(device)
         loss, correct, total = 0, 0, 0
-
+        
         if type(self.test_loader.dataset) == DatasetSplit:
             C = len(self.test_loader.dataset.dataset.classes)
         else:
@@ -81,12 +81,11 @@ class Evaler():
 
         logits_all, labels_all = [], []
 
-
         with torch.no_grad():
             # for images, labels in self.loaders["test"]:
             for idx, (images, labels) in enumerate(self.test_loader):
                 images, labels = images.to(device), labels.to(device)
-                
+                                
                 labels = labels.long()
                 
                 results = model(images)

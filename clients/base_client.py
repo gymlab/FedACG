@@ -57,6 +57,12 @@ class Client():
         else:
             train_sampler = None
             
+        stats = None
+        if "RDN" in self.args.client and self.args.client.RDN.use:
+            # self.stats = kwargs['stats']
+            self.stats = kwargs['full_stats']
+            stats = self.stats
+            
         if self.args.dataset.cutmix.use == True:
             local_dataset = CutMix(local_dataset, 
                                    num_classes=len(local_dataset.dataset.classes), 
@@ -71,7 +77,8 @@ class Client():
                                    num_mix=self.args.dataset.mixup.num_mix,
                                    beta=self.args.dataset.mixup.beta,
                                    prob=self.args.dataset.mixup.prob,
-                                   use_mixup_reg=self.args.dataset.mixup.mixup_reg)
+                                   use_mixup_reg=self.args.dataset.mixup.mixup_reg,
+                                   stats=stats)
 
         if self.args.dataset.cutmixup.use == True:
             local_dataset = CutMixup(local_dataset, 
@@ -91,6 +98,8 @@ class Client():
                                    prob=self.args.dataset.cutout.prob,
                                    use_reg=self.args.dataset.cutout.use_reg)
         
+
+        
         if self.args.dataset.new_cutmixup.use == True:
             local_dataset = NEWCutMixup(local_dataset, 
                                    num_classes=len(local_dataset.dataset.classes), 
@@ -99,7 +108,8 @@ class Client():
                                    mixup_beta=self.args.dataset.new_cutmixup.mixup_beta,
                                    mixup_prob=self.args.dataset.new_cutmixup.mixup_prob,
                                    use_reg=self.args.dataset.new_cutmixup.use_reg,
-                                   sigma=self.args.dataset.new_cutmixup.sigma)
+                                   sigma=self.args.dataset.new_cutmixup.sigma,
+                                   stats=stats)
 
         self.loader =  DataLoader(local_dataset, batch_size=self.args.batch_size, sampler=train_sampler, shuffle=train_sampler is None,
                                    num_workers=self.args.num_workers, pin_memory=self.args.pin_memory)
@@ -142,9 +152,6 @@ class Client():
         if self.args.client.get('MAFL'):
             self.mashed_data = kwargs['mashed_data']
             self.mixup_ratio = kwargs['mixup_ratio']
-
-        if "RDN" in self.args.client and self.args.client.RDN.use:
-            self.stats = kwargs['stats']
                             
         if self.args.quantizer.name != 'none':
             if self.args.quantizer.random_bit == 'fixed_alloc' or self.args.quantizer.random_bit == 'rand_alloc':
@@ -209,17 +216,24 @@ class Client():
 
             for i, (images, labels) in enumerate(self.loader):
                 
-                if "RDN" in self.args.client and self.args.client.RDN.use:
-                    random_stats = random.choice(self.stats)
-                    mean = random_stats[0]
-                    std = random_stats[1]
-                                        
-                    mean = mean.view(1, 3, 1, 1)
-                    std  = std.view(1, 3, 1, 1)
+                images, labels = images.to(self.device), labels.to(self.device)
+                
+                # if ("RDN" in self.args.client and self.args.client.RDN.use
+                #         and (not self.args.dataset.new_cutmixup.use)
+                #         and (not self.args.dataset.mixup.use)):
+                #     random_stats = random.choice(self.stats)
+                #     mean = random_stats[0].to(self.device).view(1, 3, 1, 1)
+                #     std = random_stats[1].to(self.device).view(1, 3, 1, 1)
+                #     images = (images - mean) / std
                     
+                if ("RDN" in self.args.client and self.args.client.RDN.use
+                        and (not self.args.dataset.new_cutmixup.use)
+                        and (not self.args.dataset.mixup.use)):
+                    random_stats = random.choice(self.stats)
+                    mean = random_stats[0].to(self.device).view(1, 3, 1, 1)
+                    std = random_stats[1].to(self.device).view(1, 3, 1, 1)
                     images = (images - mean) / std
 
-                images, labels = images.to(self.device), labels.to(self.device)
                 self.model.zero_grad(set_to_none=True)
 
                 with autocast(enabled=self.args.use_amp):

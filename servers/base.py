@@ -25,9 +25,25 @@ class Server():
     
     def aggregate(self, local_weights, local_deltas, client_ids, model_dict, current_lr, epoch=None):
         C = len(client_ids)
+        
+        # 1) update divergence (delta variance)
+        if local_deltas is not None and len(local_deltas) > 0:
+            grad_var = None
+            # delta_vecs = []
+            # for i in range(C):
+            #     flat = []
+            #     for k, ds in local_deltas.items():
+            #         flat.append(ds[i].reshape(-1))
+            #     delta_vecs.append(torch.cat(flat))
+            # delta_mat = torch.stack(delta_vecs, dim=0)
+            # mean_delta = delta_mat.mean(dim=0)
+            # grad_var = ((delta_mat - mean_delta) ** 2).sum(dim=1).mean()
+
+            # print(f"[Server] epoch={epoch} update_divergence(var)={grad_var.item():.6e}")
+                
         for param_key in local_weights:
             local_weights[param_key] = sum(local_weights[param_key])/C
-        return local_weights
+        return local_weights, grad_var
     
 @SERVER_REGISTRY.register()
 class AnalizeServer():

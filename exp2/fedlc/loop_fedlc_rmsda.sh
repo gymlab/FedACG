@@ -2,32 +2,17 @@
 
 data_sets=(cifar100)
 alpha_values=(0.6)
-seeds=(1 2 3 4)
+seeds=(4)
 CM_PROB=0.15
 MU_PROB=0.15
-DEVICE=4
+DEVICE=5
 
 for seed in "${seeds[@]}"; do
-    if [ $seed = 1 ]; then
-        seed=1
-    elif [ $seed = 2 ]; then
-        seed=2
-    elif [ $seed = 3 ]; then
-        seed=3
-    elif [ $seed = 4 ]; then
-        seed=4
-    elif [ $seed = 5 ]; then
-        seed=5
-    elif [ $seed = 6 ]; then
-        seed=6
-    elif [ $seed = 0 ]; then
-        seed=0
-    else
-        echo "Unknown seed: $seed"
+
+    if ! [[ "$seed" =~ ^-?[0-9]+$ ]]; then
+        echo "Invalid seed (not an integer): $seed"
         exit 1
     fi
-
-
 
     # Iterate over datasets
     for DATASET in "${data_sets[@]}"; do
@@ -39,7 +24,7 @@ for seed in "${seeds[@]}"; do
         fi
 
         # Iterate over split modes
-        for SPLIT_MODE in "iid"; do
+        for SPLIT_MODE in "dirichlet"; do
     
             if [ "$SPLIT_MODE" = "iid" ]; then
                 # For iid mode, no need to iterate over alpha

@@ -1,35 +1,16 @@
 #!/bin/bash
 
-data_sets=(tinyimagenet)
+data_sets=(cifar100)
 alpha_values=(0.6)
-sigma_values=(-0.5 0 0.5)
-seeds=(0)
+sigma_values=(-0.5 0 0.5 1)
+seeds=(42325)
 CM_PROB=0.15
 MU_PROB=0.15
-DEVICE=1
+DEVICE=5
 
 
 
 for seed in "${seeds[@]}"; do
-    if [ $seed = 1 ]; then
-        seed=1
-    elif [ $seed = 2 ]; then
-        seed=2
-    elif [ $seed = 3 ]; then
-        seed=3
-    elif [ $seed = 4 ]; then
-        seed=4
-    elif [ $seed = 5 ]; then
-        seed=5
-    elif [ $seed = 6 ]; then
-        seed=6
-    elif [ $seed = 0 ]; then
-        seed=0
-    else
-        echo "Unknown seed: $seed"
-        exit 1
-    fi
-
 
 
     # Iterate over datasets
@@ -42,7 +23,7 @@ for seed in "${seeds[@]}"; do
         fi
 
         # Iterate over split modes
-        for SPLIT_MODE in "dirichlet" "iid"; do
+        for SPLIT_MODE in "dirichlet"; do
     
             if [ "$SPLIT_MODE" = "iid" ]; then
                 for sigma in "${sigma_values[@]}"; do       
@@ -54,7 +35,7 @@ for seed in "${seeds[@]}"; do
                         split.mode="$SPLIT_MODE" trainer.participation_rate=0.05 \
                         dataset.new_cutmixup.use=true dataset.new_cutmixup.use_reg=true dataset.new_cutmixup.sigma=$sigma \
                         dataset.new_cutmixup.cutmix_prob=$CM_PROB dataset.new_cutmixup.mixup_prob=$MU_PROB \
-                        batch_size=$BATCH_SIZE wandb=True project="CVPR_REBUTTAL" seed=$seed
+                        batch_size=$BATCH_SIZE wandb=True project="sigma" seed=$seed
                 done
             else
                 # For non-iid mode, iterate over alpha values
@@ -66,7 +47,7 @@ for seed in "${seeds[@]}"; do
                             split.mode="$SPLIT_MODE" split.alpha="$ALPHA" trainer.participation_rate=0.05 \
                             dataset.new_cutmixup.use=true dataset.new_cutmixup.use_reg=true dataset.new_cutmixup.sigma=$sigma \
                             dataset.new_cutmixup.cutmix_prob=$CM_PROB dataset.new_cutmixup.mixup_prob=$MU_PROB \
-                            batch_size=$BATCH_SIZE wandb=True project="CVPR_REBUTTAL" seed=$seed
+                            batch_size=$BATCH_SIZE wandb=True project="sigma" seed=$seed
                     done
                 done
             fi

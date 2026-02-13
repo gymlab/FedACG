@@ -1,9 +1,10 @@
 #!/bin/bash
 
-data_sets=(tinyimagenet)
-alpha_values=(0.1 0.6)
+data_sets=(cifar100)
+alpha_values=(0.1 0.3 0.6)
 MU_PROB=0.3
-DEVICE=0
+DEVICE=1
+SEED=777
 
 # Iterate over datasets
 for DATASET in "${data_sets[@]}"; do
@@ -20,21 +21,21 @@ for DATASET in "${data_sets[@]}"; do
         if [ "$SPLIT_MODE" = "iid" ]; then
             # For iid mode, no need to iterate over alpha
             ALPHA=0.6
-            EXP_NAME=FedAvg_mu"$MU_PROB"_iid_num1
+            EXP_NAME=FedAvg_msda"$MU_PROB"_iid_noreg_seed"$SEED"_sigma-1
             python3 federated_train.py client=base server=base visible_devices=\'$DEVICE\' \
                 exp_name="$EXP_NAME" dataset="$DATASET" trainer.num_clients=100 \
                 split.mode="$SPLIT_MODE" trainer.participation_rate=0.05 \
-                dataset.mixup.use=true dataset.mixup.mixup_reg=true dataset.mixup.prob="$MU_PROB" \
-                batch_size="$BATCH_SIZE" wandb=True project="ICLR"
+                dataset.mixup.use=true dataset.mixup.mixup_reg=false dataset.mixup.prob="$MU_PROB" \
+                batch_size="$BATCH_SIZE" wandb=True project="sigma" seed="$SEED"
         else
             # For non-iid mode, iterate over alpha values
             for ALPHA in "${alpha_values[@]}"; do
-                EXP_NAME=FedAvg_mu"$MU_PROB"_"$ALPHA"_num1
+                EXP_NAME=FedAvg_msda"$MU_PROB"_"$ALPHA"_noreg_seed"$SEED"_sigma-1
                 python3 federated_train.py client=base server=base visible_devices=\'$DEVICE\' \
                     exp_name="$EXP_NAME" dataset="$DATASET" trainer.num_clients=100 \
                     split.mode="$SPLIT_MODE" split.alpha="$ALPHA" trainer.participation_rate=0.05 \
-                    dataset.mixup.use=true dataset.mixup.mixup_reg=true dataset.mixup.prob="$MU_PROB" \
-                    batch_size="$BATCH_SIZE" wandb=True project="ICLR"
+                    dataset.mixup.use=true dataset.mixup.mixup_reg=false dataset.mixup.prob="$MU_PROB" \
+                    batch_size="$BATCH_SIZE" wandb=True project="sigma" seed="$SEED"
             done
         fi
     done

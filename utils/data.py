@@ -386,10 +386,10 @@ class CutMix(DatasetSplitSubset):
     
     
 class Mixup(DatasetSplitSubset):
-    def __init__(self, dataset, num_classes, num_mix=2, beta=1., prob=1., use_mixup_reg=False):
+    def __init__(self, dataset, num_classes, num_mix=2, beta=1., prob=1., use_mixup_reg=False, stats=None):
         self.dataset = dataset.dataset
         self.subset_classes = dataset.subset_classes
-
+        self.stats = stats
         self.class_dict = dataset.class_dict
         self.indices = dataset.indices
 
@@ -411,6 +411,14 @@ class Mixup(DatasetSplitSubset):
     
     def __getitem__(self, item):
         img, label = self.dataset[self.indices[item]]
+        
+        # RDN normalization
+        if self.stats is not None:
+            random_stats = random.choice(self.stats)
+            mean = random_stats[0].view(3, 1, 1)
+            std = random_stats[1].view(3, 1, 1)
+            img = (img - mean) / std
+            
         label_onehot = self.onehot(label)
         # show_tensor_image(img)
         for _ in range(self.num_mix):
@@ -613,16 +621,16 @@ class Cutout(DatasetSplitSubset):
         bby2 = np.clip(cy + cut_h // 2, 0, H)
 
         return bbx1, bby1, bbx2, bby2
-    
-    
+       
 class NEWCutMixup(DatasetSplitSubset):
     def __init__(self, dataset, num_classes,
                  cutmix_prob=1.0, cutmix_beta=1.0,
                  mixup_prob=1.0, mixup_beta=1.0,
-                 use_reg=False, sigma=1.0):
-        self.dataset = dataset.dataset
-        self.subset_classes = dataset.subset_classes
+                 use_reg=False, sigma=1.0, stats=None):
 
+        self.dataset = dataset.dataset
+        self.stats = stats 
+        self.subset_classes = dataset.subset_classes
         self.class_dict = dataset.class_dict
         self.indices = dataset.indices
 
@@ -642,6 +650,14 @@ class NEWCutMixup(DatasetSplitSubset):
     # cutmix 0.1 / mixup 0.1 / none 0.8       
     def __getitem__(self, item):
         img, label = self.dataset[self.indices[item]]
+        
+        # RDN normalization
+        if self.stats is not None:
+            random_stats = random.choice(self.stats)
+            mean = random_stats[0].view(3, 1, 1)
+            std = random_stats[1].view(3, 1, 1)
+            img = (img - mean) / std
+        
         label_onehot = self.onehot(label)
 
         r = np.random.rand(1)
@@ -658,6 +674,14 @@ class NEWCutMixup(DatasetSplitSubset):
                 rand_item = random.choice(range(len(self.indices)))
                     
             img2, label2 = self.dataset[self.indices[rand_item]]
+            
+            # RDN normalization
+            if self.stats is not None:
+                random_stats = random.choice(self.stats)
+                mean = random_stats[0].view(3, 1, 1)
+                std = random_stats[1].view(3, 1, 1)
+                img2 = (img2 - mean) / std
+            
             label2_onehot = self.onehot(label2)
             label_onehot = label_onehot * lamda + label2_onehot * (1. - lamda)
 
