@@ -25,10 +25,148 @@ class Server():
     
     def aggregate(self, local_weights, local_deltas, client_ids, model_dict, current_lr, epoch=None):
         C = len(client_ids)
+        
+        if local_deltas is not None and len(local_deltas) > 0:
+            grad_var = None
+            delta_vecs = []
+            for i in range(C):
+                flat = []
+                for k, ds in local_deltas.items():
+                    flat.append(ds[i].reshape(-1))
+                delta_vecs.append(torch.cat(flat))
+            delta_mat = torch.stack(delta_vecs, dim=0)
+            mean_delta = delta_mat.mean(dim=0)
+            grad_var = ((delta_mat - mean_delta) ** 2).sum(dim=1).mean()
+
+            # print(f"[Server] epoch={epoch} update_divergence(var)={grad_var.item():.6e}")
+                
         for param_key in local_weights:
             local_weights[param_key] = sum(local_weights[param_key])/C
-        return local_weights
+            
+        return local_weights, grad_var
+
+@SERVER_REGISTRY.register()
+class ServerLOO():
+
+    def __init__(self, args):
+        self.args = args
+        self.loo_temp = getattr(args.server, "loo_temp", 1.0)
+        self.loo_lambda = getattr(args.server, "loo_lambda", 0.2)
+        self.loo_w_min = getattr(args.server, "loo_w_min", None)
+        self.loo_w_max = getattr(args.server, "loo_w_max", None)
+        return
     
+    def _average_subset(self, local_weights, selected_idx):
+
+        avg_weights = {}
+        n = len(selected_idx)
+
+        if n == 0:
+            raise ValueError("selected_idx must contain at least one client.")
+
+        for param_key, tensors in local_weights.items():
+
+            if n == len(tensors):
+                avg_weights[param_key] = torch.stack(tensors, dim=0).mean(dim=0)
+            else:
+                subset = torch.stack([tensors[i] for i in selected_idx], dim=0)
+                avg_weights[param_key] = subset.mean(dim=0)
+
+        return avg_weights
+
+    def _weighted_average(self, local_weights, weights):
+
+        weighted_avg = {}
+        C = len(weights)
+
+        for param_key, tensors in local_weights.items():
+            s = None
+            for i in range(C):
+                if s is None:
+                    s = weights[i] * tensors[i]
+                else:
+                    s = s + weights[i] * tensors[i]
+            weighted_avg[param_key] = s
+
+        return weighted_avg
+    
+    def _compute_grad_variance(self, local_deltas, C):
+
+        delta_vecs = []
+
+        for i in range(C):
+            flat = []
+            for _, ds in local_deltas.items():
+                flat.append(ds[i].reshape(-1))
+            delta_vecs.append(torch.cat(flat, dim=0))
+
+        delta_mat = torch.stack(delta_vecs, dim=0)   # [C, D]
+        mean_delta = delta_mat.mean(dim=0)           # [D]
+        grad_var = ((delta_mat - mean_delta) ** 2).sum(dim=1).mean()
+
+        return grad_var
+    
+    def aggregate(self, local_weights, local_deltas, client_ids, model_dict, current_lr, epoch=None):
+        C = len(client_ids)
+
+        grad_var = None
+        if local_deltas is not None and len(local_deltas) > 0:
+            grad_var = self._compute_grad_variance(local_deltas, C)
+            # print(f"[Server] epoch={epoch} grad_var={grad_var.item():.6e}")
+
+        fedavg_weights = self._average_subset(local_weights, list(range(C)))
+
+        loo_candidates = []
+        for i in range(C):
+            subset_idx = [j for j in range(C) if j != i]
+            loo_weights = self._average_subset(local_weights, subset_idx)
+
+            loo_candidates.append({
+                "removed_client_local_idx": i,
+                "removed_client_id": client_ids[i],
+                "weights": loo_weights
+            })
+
+        return {
+            "fedavg_weights": fedavg_weights,
+            "loo_candidates": loo_candidates,
+            "grad_var": grad_var
+        }
+
+    def aggregate_with_contributions(self, local_weights, contributions, epoch=None):
+
+        C = len(contributions)
+        if C == 0:
+            raise ValueError("contributions must not be empty.")
+
+        contrib = torch.tensor(contributions, dtype=torch.float32)
+
+        # 1) softmax over contributions
+        loo_weights = F.softmax(contrib / self.loo_temp, dim=0)
+
+        # 2) uniform(FedAvg)와 interpolation
+        uniform_weights = torch.ones(C, dtype=torch.float32) / C
+        final_weights = (1.0 - self.loo_lambda) * uniform_weights + self.loo_lambda * loo_weights
+
+        # 3) optional clipping
+        if self.loo_w_min is not None:
+            final_weights = torch.clamp(final_weights, min=self.loo_w_min)
+        if self.loo_w_max is not None:
+            final_weights = torch.clamp(final_weights, max=self.loo_w_max)
+
+        # 4) normalize again
+        final_weights = final_weights / final_weights.sum()
+
+        weighted_weights = self._weighted_average(local_weights, final_weights)
+
+        # if epoch is not None:
+        #     print(f"[Server] epoch={epoch} contribution_weights={final_weights.tolist()}")
+
+        return {
+            "weighted_weights": weighted_weights,
+            "client_weights": final_weights
+        }
+        
 @SERVER_REGISTRY.register()
 class AnalizeServer():
 

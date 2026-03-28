@@ -38,6 +38,8 @@ import matplotlib.pyplot as plt
 
 from utils.qunat_function import AQD_update, WSQ_update, compute_p_i
 
+torch.multiprocessing.set_sharing_strategy("file_system")
+
 
 @TRAINER_REGISTRY.register()
 class Trainer():
@@ -301,6 +303,9 @@ class Trainer():
                         local_deltas[param_key].append(local_state_dict[param_key] - global_state_dict[param_key])
             
             logger.info(f"Global epoch {epoch}, Train End. Total Time: {time.time() - start:.2f}s")
+            
+            use_loo = self.args.server.type == "ServerLOO"
+            server_update_mode = getattr(self.args.server, "update_mode", "fedavg")
 
             if self.args.quantizer.name == 'HQ':
                 q_list = [self.client_errors[cid] for cid in selected_client_ids]
@@ -312,8 +317,71 @@ class Trainer():
             updated_global_state_dict = self.server.aggregate(local_weights, local_deltas,
                                                             selected_client_ids, copy.deepcopy(global_state_dict), current_lr, 
                                                             epoch=epoch if self.args.server.get('AnalizeServer') else None)
+            if not use_loo:
+                fedavg_weights, grad_var = updated_global_state_dict
+                self.model.load_state_dict(fedavg_weights, strict=True)
 
-            self.model.load_state_dict(updated_global_state_dict)
+                if grad_var is not None:
+                    self.wandb_log({"train/grad_var": float(grad_var.item())}, step=epoch)
+
+            else:
+                fedavg_weights = updated_global_state_dict["fedavg_weights"]
+                loo_candidates = updated_global_state_dict["loo_candidates"]
+                grad_var = updated_global_state_dict["grad_var"]
+
+                fedavg_acc = self.evaluate_state_dict(fedavg_weights, epoch=epoch)["acc"]
+
+                contributions = []
+                for cand in loo_candidates:
+                    loo_acc = self.evaluate_state_dict(cand["weights"], epoch=epoch)["acc"]
+                    contrib = fedavg_acc - loo_acc
+                    contributions.append(float(contrib))
+
+                worst_contribution = min(contributions)
+                
+                # running stats 저장용
+                if not hasattr(self, "worst_contribution_history"):
+                    self.worst_contribution_history = []
+
+                self.worst_contribution_history.append(worst_contribution)
+                awcc = float(np.mean(self.worst_contribution_history))
+                hur = float(np.mean([1.0 if w < 0 else 0.0 for w in self.worst_contribution_history]))
+
+                weighted_result = self.server.aggregate_with_contributions(
+                    local_weights=local_weights,
+                    contributions=contributions,
+                    epoch=epoch
+                )
+                weighted_weights = weighted_result["weighted_weights"]
+
+                if server_update_mode == "fedavg":
+                    next_global = fedavg_weights
+
+                elif server_update_mode == "loo_weighted":
+                    next_global = weighted_weights
+
+                elif server_update_mode == "safe_loo":
+                    weighted_acc = self.evaluate_state_dict(weighted_weights, epoch=epoch)["acc"]
+                    if weighted_acc >= fedavg_acc:
+                        next_global = weighted_weights
+                    else:
+                        next_global = fedavg_weights
+                else:
+                    raise ValueError(f"Unknown server_update_mode: {server_update_mode}")
+
+                self.model.load_state_dict(next_global, strict=True)
+
+                wandb_dict = {
+                    "train/worst_contribution": worst_contribution,
+                    "train/AWCC": awcc,
+                    "train/HUR": hur,
+                }
+                if grad_var is not None:
+                    wandb_dict["train/grad_var"] = float(grad_var.item())
+
+                self.wandb_log(wandb_dict, step=epoch)
+
+            # self.model.load_state_dict(updated_global_state_dict)
             
             if self.args.quantizer.name == "WSQG":
                 self.model.update_all_global_std(self.args.quantizer.momentum)
@@ -337,7 +405,13 @@ class Trainer():
             terminate_processes(task_queues, processes)
 
         return
-
+    
+    def evaluate_state_dict(self, state_dict, epoch: int = -1):
+        temp_model = copy.deepcopy(self.model)
+        temp_model.load_state_dict(state_dict, strict=True)
+        results = self.evaler.eval(model=temp_model, epoch=epoch)
+        return results
+    
     def lr_update(self, epoch: int) -> None:
         if self.global_rounds == 1000:
             exponent = epoch

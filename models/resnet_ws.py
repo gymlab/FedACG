@@ -26,8 +26,8 @@ class WSConv2d(nn.Conv2d):
         self.rho = rho
         self.init_mode = init_mode
         self._reset_parameters()
-        self.global_std = nn.Parameter(torch.tensor(1e-3, dtype=torch.float32))
-        self.local_std = nn.Parameter(torch.tensor(1e-3, dtype=torch.float32))
+        # self.global_std = nn.Parameter(torch.tensor(1e-3, dtype=torch.float32))
+        # self.local_std = nn.Parameter(torch.tensor(1e-3, dtype=torch.float32))
         
     # TODO: Check!
     def _reset_parameters(self):

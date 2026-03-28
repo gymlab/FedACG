@@ -18,8 +18,8 @@ class Conv2d(nn.Conv2d):
                  padding=0, dilation=1, groups=1, bias=True):
         super(Conv2d, self).__init__(in_channels, out_channels, kernel_size, stride,
                  padding, dilation, groups, bias)
-        self.global_std = nn.Parameter(torch.tensor(1e-3, dtype=torch.float32))
-        self.local_std = nn.Parameter(torch.tensor(1e-3, dtype=torch.float32))
+        # self.global_std = nn.Parameter(torch.tensor(1e-3, dtype=torch.float32))
+        # self.local_std = nn.Parameter(torch.tensor(1e-3, dtype=torch.float32))
 
     def set_std(self, std):
         self.local_std.data = torch.full_like(self.local_std.data, std)
