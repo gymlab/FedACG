@@ -32,11 +32,12 @@ from torch.utils.data import DataLoader
 from utils import terminate_processes, initalize_random_seed, save_checkpoint
 from omegaconf import DictConfig,OmegaConf
 
-
 #from netcal.metrics import ECE
 import matplotlib.pyplot as plt
 
 from utils.qunat_function import AQD_update, WSQ_update, compute_p_i
+from utils.qjl import LayerWiseQJL
+torch.multiprocessing.set_sharing_strategy("file_system")
 
 
 @TRAINER_REGISTRY.register()
@@ -92,11 +93,24 @@ class Trainer():
             "device": eval_device,
             "args": args,
         }
+        
         self.eval_params = eval_params
         self.eval_device = eval_device
         self.evaler = evaler_type(**eval_params)
         logger.info(f"Trainer: {self.__class__}, client: {client_type}, server: {server.__class__}, evaler: {evaler_type}")
 
+        self.qjl_helper = LayerWiseQJL(
+            device=self.device,
+            qjl_ratio=getattr(args.server, "qjl_ratio", 1.0),
+            use_orthogonal=getattr(args.server, "use_orthogonal", True),
+            seed=getattr(args, "seed", 0),
+            skip_small_tensors=getattr(args.server, "skip_small_tensors", True),
+            small_tensor_threshold=getattr(args.server, "small_tensor_threshold", 256),
+            block_size=getattr(args.server, "block_size", 2048),              
+            min_m=getattr(args.server, "min_m", 32),                     
+            max_m=getattr(args.server, "max_m", 256),        
+        )
+        
         self.start_round = 0
         if self.args.get('load_model_path'):
             self.load_model()
@@ -211,7 +225,31 @@ class Trainer():
 
             if not self.args.multiprocessing:
                 break
+            
+    def estimate_true_payload(self, packed):
+        mode = packed[0]
 
+        if mode == "raw":
+            _, tensor, _ = packed
+            return tensor.numel() * tensor.element_size()
+
+        elif mode == "qjl_block":
+            _, packed_blocks, _, _ = packed
+            total = 0
+
+            for b in packed_blocks:
+                packed_sign = b["packed_sign"]
+                norm_val = b["norm_val"]
+
+                total += packed_sign.numel() * packed_sign.element_size()
+
+                if isinstance(norm_val, torch.Tensor):
+                    total += norm_val.numel() * norm_val.element_size()
+                else:
+                    total += 4  # fallback
+
+            return total
+    
     def train(self) -> Dict:
 
         result_queue = mp.Manager().Queue()
@@ -232,9 +270,17 @@ class Trainer():
                 
         for epoch in range(self.start_round, self.global_rounds):
             
+        
             self.lr_update(epoch=epoch)
             current_lr = self.lr
 
+            use_qjl = self.args.server.type == "ServerQJL" 
+            is_first_round = (epoch == 0)
+            round_raw_total = 0
+            round_packed_total = 0
+            round_layer_raw = defaultdict(float)
+            round_layer_packed = defaultdict(float)           
+            
             # AQD
             if self.args.quantizer.downlink:
                 if self.args.quantizer.name == "AQD":
@@ -282,14 +328,66 @@ class Trainer():
                     self.local_update(self.device, task_queue, result_queue)
 
                     local_state_dict, local_loss_dict = result_queue.get()
+                    
                     for loss_key in local_loss_dict:
                         local_loss_dicts[loss_key].append(local_loss_dict[loss_key])
-                        
-                    local_models.append(local_state_dict)
                     
-                    for param_key in local_state_dict:
-                        local_weights[param_key].append(local_state_dict[param_key])
-                        local_deltas[param_key].append(local_state_dict[param_key] - global_state_dict[param_key])
+                    if use_qjl:
+                        
+                        for param_key in local_state_dict:
+                            local_weights[param_key].append(local_state_dict[param_key])
+                            raw_delta = local_state_dict[param_key] - global_state_dict[param_key]
+                            
+                            is_first_or_last = param_key in ['conv1.weight', 'fc.weight', 'fc.bias']
+                            is_norm_or_bias = any(kw in param_key.lower() for kw in ['bn', 'bias', 'downsample.1'])
+                            
+                            if is_first_or_last or is_norm_or_bias:
+                                packed_delta = ("raw", raw_delta.detach().clone(), raw_delta.shape)
+                            else:
+                                packed_delta = self.qjl_helper.compress(param_key, raw_delta)
+                            
+                            # packed_delta = self.qjl_helper.compress(param_key, raw_delta)      
+                            local_deltas[param_key].append(packed_delta)
+                            
+                            if is_first_round:
+                            
+                                # # 1. pickle 기준 (실제 구현 overhead 포함)
+                                # raw_pickle = len(pickle.dumps(raw_delta))
+                                # packed_pickle = len(pickle.dumps(packed_delta))
+
+                                # print("===== Pickle 기준 =====")
+                                # print(f"{raw_pickle / packed_pickle:.2f}x")
+                                
+                                r_size = raw_delta.numel() * raw_delta.element_size()
+                                p_size = self.estimate_true_payload(packed_delta)
+
+                                round_raw_total += r_size
+                                round_packed_total += p_size
+
+                                round_layer_raw[param_key] += r_size
+                                round_layer_packed[param_key] += p_size
+                        
+                    else:
+                        for param_key in local_state_dict:
+                            local_weights[param_key].append(local_state_dict[param_key])
+                            local_deltas[param_key].append(local_state_dict[param_key] - global_state_dict[param_key])               
+
+            if is_first_round and use_qjl:
+                layer_log = {
+                    f"Comm_Layers/{k.replace('.', '/')}_Ratio": round_layer_raw[k] / max(round_layer_packed[k], 1)
+                    for k in round_layer_raw
+                }
+
+                round_ratio = round_raw_total / max(round_packed_total, 1)
+
+                wandb.log({
+                    "Comm/Round_Compression_Ratio": round_ratio,
+                    "Comm/Round_Total_Raw_MB": round_raw_total / (1024 * 1024),
+                    "Comm/Round_Total_Upload_MB": round_packed_total / (1024 * 1024),
+                    "Comm/Round_Saved_Percent": 100.0 * (1.0 - round_packed_total / max(round_raw_total, 1)),
+                    **layer_log
+                }, step=epoch)
+                    
 
             if self.args.multiprocessing:
                 for _ in range(len(selected_client_ids)):
@@ -308,9 +406,12 @@ class Trainer():
             
             logger.info(f"Global epoch {epoch}, Train End. Total Time: {time.time() - start:.2f}s")
             
-            if ((epoch + 1) % 50 == 0 or epoch == 0):
-                local_acc = self.local_evaluate(local_models, epoch)
-                logger.info(local_acc)
+            # use_loo = self.args.server.type == "ServerLOO"
+            # server_update_mode = getattr(self.args.server, "update_mode", "fedavg")
+            
+            # if ((epoch + 1) % 50 == 0 or epoch == 0):
+            #     local_acc = self.local_evaluate(local_models, epoch)
+            #     logger.info(local_acc)
                 
             if self.args.quantizer.name == 'HQ':
                 q_list = [self.client_errors[cid] for cid in selected_client_ids]
@@ -319,9 +420,72 @@ class Trainer():
                     for i, w_i in enumerate(local_weights[param_key]):
                         local_weights[param_key][i] = p_list[i] * w_i * len(selected_client_ids)
                         
-            updated_global_state_dict, grad_var = self.server.aggregate(local_weights, local_deltas,
+            updated_global_state_dict  = self.server.aggregate(local_weights, local_deltas,
                                                             selected_client_ids, copy.deepcopy(global_state_dict), current_lr, 
                                                             epoch=epoch if self.args.server.get('AnalizeServer') else None)
+            # if not use_loo:
+            #     fedavg_weights, grad_var = updated_global_state_dict
+            #     self.model.load_state_dict(fedavg_weights, strict=True)
+
+            #     if grad_var is not None:
+            #         self.wandb_log({"train/grad_var": float(grad_var.item())}, step=epoch)
+
+            # else:
+            #     fedavg_weights = updated_global_state_dict["fedavg_weights"]
+            #     loo_candidates = updated_global_state_dict["loo_candidates"]
+            #     grad_var = updated_global_state_dict["grad_var"]
+
+            #     fedavg_acc = self.evaluate_state_dict(fedavg_weights, epoch=epoch)["acc"]
+
+            #     contributions = []
+            #     for cand in loo_candidates:
+            #         loo_acc = self.evaluate_state_dict(cand["weights"], epoch=epoch)["acc"]
+            #         contrib = fedavg_acc - loo_acc
+            #         contributions.append(float(contrib))
+
+            #     worst_contribution = min(contributions)
+                
+            #     # running stats 저장용
+            #     if not hasattr(self, "worst_contribution_history"):
+            #         self.worst_contribution_history = []
+
+            #     self.worst_contribution_history.append(worst_contribution)
+            #     awcc = float(np.mean(self.worst_contribution_history))
+            #     hur = float(np.mean([1.0 if w < 0 else 0.0 for w in self.worst_contribution_history]))
+
+            #     weighted_result = self.server.aggregate_with_contributions(
+            #         local_weights=local_weights,
+            #         contributions=contributions,
+            #         epoch=epoch
+            #     )
+            #     weighted_weights = weighted_result["weighted_weights"]
+
+            #     if server_update_mode == "fedavg":
+            #         next_global = fedavg_weights
+
+            #     elif server_update_mode == "loo_weighted":
+            #         next_global = weighted_weights
+
+            #     elif server_update_mode == "safe_loo":
+            #         weighted_acc = self.evaluate_state_dict(weighted_weights, epoch=epoch)["acc"]
+            #         if weighted_acc >= fedavg_acc:
+            #             next_global = weighted_weights
+            #         else:
+            #             next_global = fedavg_weights
+            #     else:
+            #         raise ValueError(f"Unknown server_update_mode: {server_update_mode}")
+
+            #     self.model.load_state_dict(next_global, strict=True)
+
+            #     wandb_dict = {
+            #         "train/worst_contribution": worst_contribution,
+            #         "train/AWCC": awcc,
+            #         "train/HUR": hur,
+            #     }
+            #     if grad_var is not None:
+            #         wandb_dict["train/grad_var"] = float(grad_var.item())
+
+            #     self.wandb_log(wandb_dict, step=epoch)
 
             self.model.load_state_dict(updated_global_state_dict)
             
@@ -337,7 +501,7 @@ class Trainer():
             # Logging
             wandb_dict = {loss_key: np.mean(local_loss_dicts[loss_key]) for loss_key in local_loss_dicts}
             wandb_dict['lr'] = self.lr
-            wandb_dict['grad_var'] = grad_var
+            # wandb_dict['grad_var'] = grad_var
 
             self.wandb_log(wandb_dict, step=epoch)
 
@@ -348,7 +512,13 @@ class Trainer():
             terminate_processes(task_queues, processes)
 
         return
-
+    
+    def evaluate_state_dict(self, state_dict, epoch: int = -1):
+        temp_model = copy.deepcopy(self.model)
+        temp_model.load_state_dict(state_dict, strict=True)
+        results = self.evaler.eval(model=temp_model, epoch=epoch)
+        return results
+    
     def lr_update(self, epoch: int) -> None:
         if self.global_rounds == 1000:
             exponent = epoch

@@ -1,0 +1,11 @@
+## Server ##
+type: ServerQJL
+momentum: -1
+
+qjl_ratio: 1.0
+use_orthogonal: False
+skip_small_tensors: True
+small_tensor_threshold : 256
+block_size : 2048
+min_m : 32
+max_m : 256
