@@ -9,9 +9,11 @@ from sklearn.manifold import TSNE
 
 from utils import *
 from utils.metrics import evaluate
+from utils.qjl import LayerWiseQJL
 from models import build_encoder
 from typing import Callable, Dict, Tuple, Union, List
 
+from collections import OrderedDict
 import wandb
 
 from servers.build import SERVER_REGISTRY
@@ -44,6 +46,57 @@ class Server():
             local_weights[param_key] = sum(local_weights[param_key])/C
             
         return local_weights, grad_var
+
+@SERVER_REGISTRY.register()
+class ServerQJL():
+
+    def __init__(self, args):
+        self.args = args
+        
+        self.qjl_helper = LayerWiseQJL(
+            qjl_ratio=getattr(args.server, "qjl_ratio", 1.0),
+            use_orthogonal=getattr(args.server, "use_orthogonal", True),
+            seed=getattr(args, "seed", 0),
+            skip_small_tensors=getattr(args.server, "skip_small_tensors", True),
+            small_tensor_threshold=getattr(args.server, "small_tensor_threshold", 256),
+            block_size=getattr(args.server, "block_size", 2048),              
+            min_m=getattr(args.server, "min_m", 32),                     
+            max_m=getattr(args.server, "max_m", 256),        
+        )
+        return
+    
+    def aggregate(self, local_weights, local_deltas, client_ids, model_dict, current_lr, epoch=None):
+        C = len(client_ids)
+
+        # global delta accumulator
+        agg_delta = OrderedDict()
+        for param_key in model_dict:
+            agg_delta[param_key] = torch.zeros_like(model_dict[param_key])
+
+        # local_deltas[param_key] 안에는 각 client가 보낸 packed update가 들어있다고 가정
+        for param_key in local_deltas:
+            for packed in local_deltas[param_key]:
+                delta_hat_flat = self.qjl_helper.decompress(param_key, packed)
+
+                # raw tensor가 바로 나올 수도 있고, flat tensor가 나올 수도 있으니 shape 맞춤
+                if delta_hat_flat.shape != model_dict[param_key].shape:
+                    delta_hat = delta_hat_flat.view_as(model_dict[param_key])
+                else:
+                    delta_hat = delta_hat_flat
+
+                delta_hat = delta_hat.to(
+                    device=model_dict[param_key].device,
+                    dtype=model_dict[param_key].dtype
+                    )
+
+                agg_delta[param_key] += delta_hat / C
+
+        # global model update
+        for param_key in model_dict:
+            model_dict[param_key] = model_dict[param_key] + agg_delta[param_key]
+
+        return model_dict
+
 
 @SERVER_REGISTRY.register()
 class ServerLOO():
