@@ -7,7 +7,7 @@ qjl_ratios=(0.5)
 block_sizes=(2048)
 ORTH=true
 weight_mode=raw
-tau=0.05
+tau=1.0
 
 
 if [ "$ORTH" = true ]; then
@@ -36,7 +36,7 @@ for BLOCK in "${block_sizes[@]}"; do
                 if [ "$SPLIT_MODE" = "iid" ]; then
                     # For iid mode, no need to iterate over alpha
                     ALPHA=0.6
-                    EXP_NAME=FedAvg_iid_QJL"$QJL"_B"$BLOCK"${ORTH_TAG}_tau"$tau"_"$weight_mode"_way
+                    EXP_NAME=FedAvg_iid_QJL"$QJL"_B"$BLOCK"${ORTH_TAG}_tau"$tau"_"$weight_mode"_byz0.2
                     python federated_train.py client=base server=FedQJL visible_devices=\'$DEVICE\' \
                         exp_name="$EXP_NAME" dataset="$DATASET" trainer.num_clients=100 \
                         split.mode="$SPLIT_MODE" trainer.participation_rate=0.05 \
@@ -47,7 +47,7 @@ for BLOCK in "${block_sizes[@]}"; do
                 else
                     # For non-iid mode, iterate over alpha values
                     for ALPHA in "${alpha_values[@]}"; do
-                        EXP_NAME=FedAvg_"$ALPHA"_QJL"$QJL"_B"$BLOCK"${ORTH_TAG}_tau"$tau"_"$weight_mode"_way
+                        EXP_NAME=FedAvg_"$ALPHA"_QJL"$QJL"_B"$BLOCK"${ORTH_TAG}_tau"$tau"_"$weight_mode"_byz0.2
                         python federated_train.py client=base server=FedQJL visible_devices=\'$DEVICE\' \
                             exp_name="$EXP_NAME" dataset="$DATASET" trainer.num_clients=100 \
                             split.mode="$SPLIT_MODE" split.alpha="$ALPHA" trainer.participation_rate=0.05 \

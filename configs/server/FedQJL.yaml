@@ -15,5 +15,7 @@ ema_beta: 0.9
 warmup_rounds: 5
 tau: 1.0
 weight_cap: 0.7
-use_filtering: False
+use_filtering: True
 weight_mode: raw
+
+byzantine_ratio: 0.2

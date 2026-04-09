@@ -1,3 +1,5 @@
 ## Server ##
 type: Server
 momentum: -1
+
+byzantine_ratio: 0.2

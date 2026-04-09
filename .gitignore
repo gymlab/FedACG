@@ -19,3 +19,4 @@ tmp
 grad_output_logs/
 .vscode/
 scatter/
+client_data.zip

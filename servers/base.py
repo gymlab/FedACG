@@ -25,27 +25,27 @@ class Server():
         self.args = args
         return
     
-    def aggregate(self, local_weights, local_deltas, client_ids, model_dict, current_lr, epoch=None):
+    def aggregate(self, local_weights, local_deltas, client_ids, model_dict, current_lr, epoch=None, local_compressed=None):
         C = len(client_ids)
         
-        if local_deltas is not None and len(local_deltas) > 0:
-            grad_var = None
-            delta_vecs = []
-            for i in range(C):
-                flat = []
-                for k, ds in local_deltas.items():
-                    flat.append(ds[i].reshape(-1))
-                delta_vecs.append(torch.cat(flat))
-            delta_mat = torch.stack(delta_vecs, dim=0)
-            mean_delta = delta_mat.mean(dim=0)
-            grad_var = ((delta_mat - mean_delta) ** 2).sum(dim=1).mean()
+        # if local_deltas is not None and len(local_deltas) > 0:
+        #     grad_var = None
+        #     delta_vecs = []
+        #     for i in range(C):
+        #         flat = []
+        #         for k, ds in local_deltas.items():
+        #             flat.append(ds[i].reshape(-1))
+        #         delta_vecs.append(torch.cat(flat))
+        #     delta_mat = torch.stack(delta_vecs, dim=0)
+        #     mean_delta = delta_mat.mean(dim=0)
+        #     grad_var = ((delta_mat - mean_delta) ** 2).sum(dim=1).mean()
 
             # print(f"[Server] epoch={epoch} update_divergence(var)={grad_var.item():.6e}")
                 
         for param_key in local_weights:
             local_weights[param_key] = sum(local_weights[param_key])/C
             
-        return local_weights, grad_var
+        return local_weights
 
 
 
@@ -104,44 +104,62 @@ class ServerQJL:
             "qjl/p_value": p_value,
         }, step=self.round_idx)
         
-    def aggregate(self, local_weights, local_deltas, client_ids, model_dict, current_lr, epoch=None, local_compressed=None):
+
+    def aggregate(
+        self,
+        local_weights,
+        local_deltas,
+        client_ids,
+        model_dict,
+        current_lr,
+        epoch=None,
+        local_compressed=None,
+    ):
         device = next(iter(model_dict.values())).device
         C = len(next(iter(local_deltas.values())))
         agg_delta = OrderedDict()
         self.round_idx += 1
 
+        # --------------------------------------------------
+        # [추가 1] g_global 갱신용 robust reference delta (median)
+        # --------------------------------------------------
+        ref_delta = OrderedDict()
+        for param_key in model_dict:
+            ref_delta[param_key] = torch.median(
+                torch.stack(local_deltas[param_key], dim=0), dim=0
+            ).values
+
+        # --------------------------------------------------
+        # warm-up: 기존 mean 대신 median 사용
+        # --------------------------------------------------
         if self.g_global is None or self.round_idx <= self.warmup_rounds:
             for param_key in model_dict:
-                agg_delta[param_key] = torch.stack(local_deltas[param_key]).mean(dim=0)
+                agg_delta[param_key] = ref_delta[param_key]
+
         else:
             client_scores = torch.zeros(C, device=device, dtype=torch.float32)
-            
-            ###
-            true_scores = torch.zeros(C, device=device, dtype=torch.float32)
 
             for param_key in model_dict:
                 if param_key not in self.g_global:
                     continue
+
                 g = self.g_global[param_key].to(
                     device=device, dtype=model_dict[param_key].dtype
                 )
+
                 for i, compressed in enumerate(local_compressed[param_key]):
                     sim = self.qjl_helper.estimate_inner_product(
                         param_key, g, compressed
                     )
+
+                    # small tensor fallback
                     if sim is None:
                         raw_delta = local_deltas[param_key][i].to(device, dtype=g.dtype)
                         sim = torch.sum(g * raw_delta).item()
-                    client_scores[i] += sim
-                    
-                    # True IP (검증용)
-                    raw_delta = local_deltas[param_key][i].to(device, dtype=g.dtype)
-                    true_scores[i] += torch.sum(g * raw_delta).item()
-                    
-            if self.warmup_rounds < self.round_idx <= self.warmup_rounds + 30:
-                self._log_estimator_quality(true_scores, client_scores)
 
-            # filtering: raw score
+                    client_scores[i] += sim
+
+            # filtering: 기존 그대로 유지
             if self.use_filtering:
                 valid_mask = client_scores >= self.similarity_threshold
                 if valid_mask.sum() == 0:
@@ -152,17 +170,45 @@ class ServerQJL:
             valid_indices = torch.where(valid_mask)[0].tolist()
             filtered_scores = client_scores[valid_indices]
 
+            # ===== 로그 수집용 dict =====
+            log_dict = {}
+
+            # === score / collapse 로그 ===
+            num_valid = len(valid_indices)
+            score_min = client_scores.min().item()
+            score_max = client_scores.max().item()
+            score_std = client_scores.std().item()
+            num_negative = (client_scores < 0).sum().item()
+
+            print(f"[Round {self.round_idx}] "
+                f"valid={num_valid}/{C} | "
+                f"score(min={score_min:.4f}, max={score_max:.4f}, std={score_std:.4f})")
+
+            if num_valid <= 2:
+                print(f"⚠️ COLLAPSE DETECTED: only {num_valid} clients survived")
+
+            log_dict.update({
+                "debug/num_valid": num_valid,
+                "debug/score_std": score_std,
+                "debug/score_min": score_min,
+                "debug/score_max": score_max,
+                "debug/num_negative": num_negative,
+                "debug/collapse_flag": int(num_valid <= 2),
+            })
+            #=========
+            
+            # weighting: 기존 그대로 유지
             if len(valid_indices) == 1:
                 weights = torch.ones(1, device=device, dtype=torch.float32)
             else:
-                if self.weight_mode == 'zscore':
+                if self.weight_mode == "zscore":
                     mu = filtered_scores.mean()
                     sigma = filtered_scores.std().clamp(min=1e-6)
                     weight_scores = (filtered_scores - mu) / sigma
-                elif self.weight_mode == 'rank':
+                elif self.weight_mode == "rank":
                     ranks = torch.argsort(torch.argsort(filtered_scores)).float()
                     weight_scores = ranks - ranks.mean()
-                else:
+                else:  # raw
                     weight_scores = filtered_scores
 
                 tau = max(float(self.tau), 1e-6)
@@ -172,9 +218,32 @@ class ServerQJL:
                     weights = torch.clamp(weights, max=self.weight_cap)
                     weights = weights / weights.sum()
 
-            print(f"Round {self.round_idx} scores: {client_scores.cpu().tolist()}")
-            print(f"Round {self.round_idx} weights: {weights.cpu().tolist()}")
+            # ==========================
 
+            if len(valid_indices) > 1:
+                w_max = weights.max().item()
+                w_min = weights.min().item()
+                entropy = -(weights * torch.log(weights + 1e-8)).sum().item()
+
+                print(f"   weights: max={w_max:.3f}, min={w_min:.3f}, entropy={entropy:.3f}")
+
+                log_dict.update({
+                    "debug/weight_max": w_max,
+                    "debug/weight_min": w_min,
+                    "debug/weight_entropy": entropy,
+                })
+            else:
+                print("   weights: single client")
+
+                log_dict.update({
+                    "debug/weight_max": 1.0,
+                    "debug/weight_min": 1.0,
+                    "debug/weight_entropy": 0.0,
+                })
+
+            wandb.log(log_dict)
+            # ======================
+            
             for param_key in model_dict:
                 agg = torch.zeros_like(model_dict[param_key])
                 for j, i in enumerate(valid_indices):
@@ -182,17 +251,23 @@ class ServerQJL:
                     agg += weights[j] * d
                 agg_delta[param_key] = agg
 
+        # --------------------------------------------------
+        # global model update
+        # --------------------------------------------------
         new_model_dict = OrderedDict()
         for param_key in model_dict:
             new_model_dict[param_key] = model_dict[param_key] + agg_delta[param_key]
 
+        # --------------------------------------------------
+        # [추가 2] g_global EMA는 agg_delta가 아니라 ref_delta(median)로 갱신
+        # --------------------------------------------------
         if self.g_global is None:
-            self.g_global = {k: v.detach().clone() for k, v in agg_delta.items()}
+            self.g_global = {k: v.detach().clone() for k, v in ref_delta.items()}
         else:
-            for k in agg_delta:
+            for k in ref_delta:
                 self.g_global[k] = (
                     self.ema_beta * self.g_global[k]
-                    + (1 - self.ema_beta) * agg_delta[k].detach().clone()
+                    + (1 - self.ema_beta) * ref_delta[k].detach().clone()
                 )
 
         return new_model_dict

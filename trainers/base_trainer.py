@@ -10,7 +10,7 @@ import tqdm
 import wandb
 import gc
 import psutil
-
+import random
 import pickle, os
 import numpy as np
 
@@ -114,7 +114,14 @@ class Trainer():
             
         if self.args.quantizer.name == "WSQG" and self.args.quantizer.random_bit == 'fixed_alloc':
             self.local_wt_bits = np.random.choice(np.array([1, 2, 4]), size=self.args.trainer.num_clients, replace=True)
-
+       
+        num_byzantine = int(self.num_clients * getattr(self.args.server, 'byzantine_ratio', 0.0))
+        if num_byzantine > 0:
+            random.seed(self.args.seed)
+            self.byzantine_ids = set(random.sample(range(self.num_clients), num_byzantine))
+            print(f"Byzantine clients: {self.byzantine_ids}")
+        else:
+            self.byzantine_ids = set()
 
     def _build_mafl_means(self, local_dataset, M_k: int) -> list:
 
@@ -265,11 +272,6 @@ class Trainer():
             current_lr = self.lr
 
             use_qjl = self.args.server.type == "ServerQJL" 
-            is_first_round = (epoch == 0)
-            round_raw_total = 0
-            round_packed_total = 0
-            round_layer_raw = defaultdict(float)
-            round_layer_packed = defaultdict(float)           
             
             # AQD
             if self.args.quantizer.downlink:
@@ -328,6 +330,11 @@ class Trainer():
                         for param_key in local_state_dict:
                             # local_weights[param_key].append(local_state_dict[param_key])
                             raw_delta = (local_state_dict[param_key] - global_state_dict[param_key]).detach().clone()
+                            
+                            # ---- Byzantine attack ----
+                            if client_idx in self.byzantine_ids:
+                                raw_delta = -raw_delta
+                            
                             compressed = self.qjl_helper.compress_for_similarity(param_key, raw_delta)
                             
                             local_deltas[param_key].append(raw_delta)
@@ -335,8 +342,12 @@ class Trainer():
                                 
                     else:
                         for param_key in local_state_dict:
-                            local_weights[param_key].append(local_state_dict[param_key])
-                            local_deltas[param_key].append(local_state_dict[param_key] - global_state_dict[param_key])        
+                            if client_idx in self.byzantine_ids:
+                                # sign flip: global - delta 대신 global + delta
+                                attacked_weight = 2 * global_state_dict[param_key] - local_state_dict[param_key]
+                                local_weights[param_key].append(attacked_weight)
+                            else:
+                                local_weights[param_key].append(local_state_dict[param_key])       
 
             if self.args.multiprocessing:
                 for _ in range(len(selected_client_ids)):
