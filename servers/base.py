@@ -9,7 +9,7 @@ from sklearn.manifold import TSNE
 
 from utils import *
 from utils.metrics import evaluate
-from utils.qjl import LayerWiseQJL
+from utils.qjl import build_qjl_helper
 from models import build_encoder
 from typing import Callable, Dict, Tuple, Union, List
 
@@ -47,56 +47,155 @@ class Server():
             
         return local_weights, grad_var
 
-@SERVER_REGISTRY.register()
-class ServerQJL():
 
+
+@SERVER_REGISTRY.register()
+class ServerQJL:
     def __init__(self, args):
         self.args = args
+
+        self.similarity_threshold = getattr(args.server, "similarity_threshold", 0.0)
+        self.ema_beta = getattr(args.server, "ema_beta", 0.9)
+        self.warmup_rounds = getattr(args.server, "warmup_rounds", 5)
+        self.tau = getattr(args.server, "tau", 1.0)
+        self.weight_cap = getattr(args.server, "weight_cap", 0.7)
+        self.use_filtering = getattr(args.server, "use_filtering", False)
+        self.weight_mode = getattr(args.server, "weight_mode", "raw")
+
+        self.g_global = None
+        self.round_idx = 0
+
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        self.qjl_helper = build_qjl_helper(args, self.device)
+
+    def _log_estimator_quality(self, true_scores, qjl_scores):
+        from scipy.stats import spearmanr
+        import json
+        import os
+
+        true_np = true_scores.cpu().numpy()
+        qjl_np = qjl_scores.cpu().numpy()
+
+        spearman_corr, p_value = spearmanr(true_np, qjl_np)
+
+        log = {
+            "round": self.round_idx,
+            "true_scores": true_np.tolist(),
+            "qjl_scores": qjl_np.tolist(),
+            "spearman_corr": float(spearman_corr),
+            "p_value": float(p_value),
+        }
+
+        print(f"\n===== QJL Estimator Verification (Round {self.round_idx}) =====")
+        for i in range(len(true_np)):
+            print(f"  Client {i}: true={true_np[i]:.4f}, qjl={qjl_np[i]:.4f}")
+        print(f"  Spearman correlation: {spearman_corr:.4f} (p={p_value:.4f})")
+        print("=" * 55)
         
-        self.qjl_helper = LayerWiseQJL(
-            qjl_ratio=getattr(args.server, "qjl_ratio", 1.0),
-            use_orthogonal=getattr(args.server, "use_orthogonal", True),
-            seed=getattr(args, "seed", 0),
-            skip_small_tensors=getattr(args.server, "skip_small_tensors", True),
-            small_tensor_threshold=getattr(args.server, "small_tensor_threshold", 256),
-            block_size=getattr(args.server, "block_size", 2048),              
-            min_m=getattr(args.server, "min_m", 32),                     
-            max_m=getattr(args.server, "max_m", 256),        
-        )
-        return
-    
-    def aggregate(self, local_weights, local_deltas, client_ids, model_dict, current_lr, epoch=None):
-        C = len(client_ids)
-
-        # global delta accumulator
+        exp_name = getattr(self.args, "exp_name", "default")
+        save_dir = os.path.join("scatter", exp_name)
+        os.makedirs(save_dir, exist_ok=True)
+        with open(os.path.join(save_dir, f"qjl_verify_round{self.round_idx}.json"), "w") as f:
+            json.dump(log, f, indent=2)
+            
+        wandb.log({
+            "qjl/spearman": spearman_corr,
+            "qjl/p_value": p_value,
+        }, step=self.round_idx)
+        
+    def aggregate(self, local_weights, local_deltas, client_ids, model_dict, current_lr, epoch=None, local_compressed=None):
+        device = next(iter(model_dict.values())).device
+        C = len(next(iter(local_deltas.values())))
         agg_delta = OrderedDict()
-        for param_key in model_dict:
-            agg_delta[param_key] = torch.zeros_like(model_dict[param_key])
+        self.round_idx += 1
 
-        # local_deltas[param_key] 안에는 각 client가 보낸 packed update가 들어있다고 가정
-        for param_key in local_deltas:
-            for packed in local_deltas[param_key]:
-                delta_hat_flat = self.qjl_helper.decompress(param_key, packed)
+        if self.g_global is None or self.round_idx <= self.warmup_rounds:
+            for param_key in model_dict:
+                agg_delta[param_key] = torch.stack(local_deltas[param_key]).mean(dim=0)
+        else:
+            client_scores = torch.zeros(C, device=device, dtype=torch.float32)
+            
+            ###
+            true_scores = torch.zeros(C, device=device, dtype=torch.float32)
 
-                # raw tensor가 바로 나올 수도 있고, flat tensor가 나올 수도 있으니 shape 맞춤
-                if delta_hat_flat.shape != model_dict[param_key].shape:
-                    delta_hat = delta_hat_flat.view_as(model_dict[param_key])
-                else:
-                    delta_hat = delta_hat_flat
-
-                delta_hat = delta_hat.to(
-                    device=model_dict[param_key].device,
-                    dtype=model_dict[param_key].dtype
+            for param_key in model_dict:
+                if param_key not in self.g_global:
+                    continue
+                g = self.g_global[param_key].to(
+                    device=device, dtype=model_dict[param_key].dtype
+                )
+                for i, compressed in enumerate(local_compressed[param_key]):
+                    sim = self.qjl_helper.estimate_inner_product(
+                        param_key, g, compressed
                     )
+                    if sim is None:
+                        raw_delta = local_deltas[param_key][i].to(device, dtype=g.dtype)
+                        sim = torch.sum(g * raw_delta).item()
+                    client_scores[i] += sim
+                    
+                    # True IP (검증용)
+                    raw_delta = local_deltas[param_key][i].to(device, dtype=g.dtype)
+                    true_scores[i] += torch.sum(g * raw_delta).item()
+                    
+            if self.warmup_rounds < self.round_idx <= self.warmup_rounds + 30:
+                self._log_estimator_quality(true_scores, client_scores)
 
-                agg_delta[param_key] += delta_hat / C
+            # filtering: raw score
+            if self.use_filtering:
+                valid_mask = client_scores >= self.similarity_threshold
+                if valid_mask.sum() == 0:
+                    valid_mask = torch.ones(C, dtype=torch.bool, device=device)
+            else:
+                valid_mask = torch.ones(C, dtype=torch.bool, device=device)
 
-        # global model update
+            valid_indices = torch.where(valid_mask)[0].tolist()
+            filtered_scores = client_scores[valid_indices]
+
+            if len(valid_indices) == 1:
+                weights = torch.ones(1, device=device, dtype=torch.float32)
+            else:
+                if self.weight_mode == 'zscore':
+                    mu = filtered_scores.mean()
+                    sigma = filtered_scores.std().clamp(min=1e-6)
+                    weight_scores = (filtered_scores - mu) / sigma
+                elif self.weight_mode == 'rank':
+                    ranks = torch.argsort(torch.argsort(filtered_scores)).float()
+                    weight_scores = ranks - ranks.mean()
+                else:
+                    weight_scores = filtered_scores
+
+                tau = max(float(self.tau), 1e-6)
+                weights = F.softmax(weight_scores / tau, dim=0)
+
+                if self.weight_cap < 1.0:
+                    weights = torch.clamp(weights, max=self.weight_cap)
+                    weights = weights / weights.sum()
+
+            print(f"Round {self.round_idx} scores: {client_scores.cpu().tolist()}")
+            print(f"Round {self.round_idx} weights: {weights.cpu().tolist()}")
+
+            for param_key in model_dict:
+                agg = torch.zeros_like(model_dict[param_key])
+                for j, i in enumerate(valid_indices):
+                    d = local_deltas[param_key][i].to(agg.device, dtype=agg.dtype)
+                    agg += weights[j] * d
+                agg_delta[param_key] = agg
+
+        new_model_dict = OrderedDict()
         for param_key in model_dict:
-            model_dict[param_key] = model_dict[param_key] + agg_delta[param_key]
+            new_model_dict[param_key] = model_dict[param_key] + agg_delta[param_key]
 
-        return model_dict
+        if self.g_global is None:
+            self.g_global = {k: v.detach().clone() for k, v in agg_delta.items()}
+        else:
+            for k in agg_delta:
+                self.g_global[k] = (
+                    self.ema_beta * self.g_global[k]
+                    + (1 - self.ema_beta) * agg_delta[k].detach().clone()
+                )
 
+        return new_model_dict
 
 @SERVER_REGISTRY.register()
 class ServerLOO():

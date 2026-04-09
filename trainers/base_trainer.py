@@ -36,7 +36,7 @@ from omegaconf import DictConfig,OmegaConf
 import matplotlib.pyplot as plt
 
 from utils.qunat_function import AQD_update, WSQ_update, compute_p_i
-from utils.qjl import LayerWiseQJL
+from utils.qjl import build_qjl_helper
 torch.multiprocessing.set_sharing_strategy("file_system")
 
 
@@ -99,17 +99,7 @@ class Trainer():
         self.evaler = evaler_type(**eval_params)
         logger.info(f"Trainer: {self.__class__}, client: {client_type}, server: {server.__class__}, evaler: {evaler_type}")
 
-        self.qjl_helper = LayerWiseQJL(
-            device=self.device,
-            qjl_ratio=getattr(args.server, "qjl_ratio", 1.0),
-            use_orthogonal=getattr(args.server, "use_orthogonal", True),
-            seed=getattr(args, "seed", 0),
-            skip_small_tensors=getattr(args.server, "skip_small_tensors", True),
-            small_tensor_threshold=getattr(args.server, "small_tensor_threshold", 256),
-            block_size=getattr(args.server, "block_size", 2048),              
-            min_m=getattr(args.server, "min_m", 32),                     
-            max_m=getattr(args.server, "max_m", 256),        
-        )
+        self.qjl_helper = build_qjl_helper(args, self.device)
         
         self.start_round = 0
         if self.args.get('load_model_path'):
@@ -301,6 +291,7 @@ class Trainer():
             local_weights = defaultdict(list)
             local_loss_dicts = defaultdict(list)
             local_deltas = defaultdict(list)
+            local_compressed = defaultdict(list)
             
             local_models = []
             
@@ -335,59 +326,17 @@ class Trainer():
                     if use_qjl:
                         
                         for param_key in local_state_dict:
-                            local_weights[param_key].append(local_state_dict[param_key])
-                            raw_delta = local_state_dict[param_key] - global_state_dict[param_key]
+                            # local_weights[param_key].append(local_state_dict[param_key])
+                            raw_delta = (local_state_dict[param_key] - global_state_dict[param_key]).detach().clone()
+                            compressed = self.qjl_helper.compress_for_similarity(param_key, raw_delta)
                             
-                            is_first_or_last = param_key in ['conv1.weight', 'fc.weight', 'fc.bias']
-                            is_norm_or_bias = any(kw in param_key.lower() for kw in ['bn', 'bias', 'downsample.1'])
-                            
-                            if is_first_or_last or is_norm_or_bias:
-                                packed_delta = ("raw", raw_delta.detach().clone(), raw_delta.shape)
-                            else:
-                                packed_delta = self.qjl_helper.compress(param_key, raw_delta)
-                            
-                            # packed_delta = self.qjl_helper.compress(param_key, raw_delta)      
-                            local_deltas[param_key].append(packed_delta)
-                            
-                            if is_first_round:
-                            
-                                # # 1. pickle 기준 (실제 구현 overhead 포함)
-                                # raw_pickle = len(pickle.dumps(raw_delta))
-                                # packed_pickle = len(pickle.dumps(packed_delta))
-
-                                # print("===== Pickle 기준 =====")
-                                # print(f"{raw_pickle / packed_pickle:.2f}x")
+                            local_deltas[param_key].append(raw_delta)
+                            local_compressed[param_key].append(compressed)
                                 
-                                r_size = raw_delta.numel() * raw_delta.element_size()
-                                p_size = self.estimate_true_payload(packed_delta)
-
-                                round_raw_total += r_size
-                                round_packed_total += p_size
-
-                                round_layer_raw[param_key] += r_size
-                                round_layer_packed[param_key] += p_size
-                        
                     else:
                         for param_key in local_state_dict:
                             local_weights[param_key].append(local_state_dict[param_key])
-                            local_deltas[param_key].append(local_state_dict[param_key] - global_state_dict[param_key])               
-
-            if is_first_round and use_qjl:
-                layer_log = {
-                    f"Comm_Layers/{k.replace('.', '/')}_Ratio": round_layer_raw[k] / max(round_layer_packed[k], 1)
-                    for k in round_layer_raw
-                }
-
-                round_ratio = round_raw_total / max(round_packed_total, 1)
-
-                wandb.log({
-                    "Comm/Round_Compression_Ratio": round_ratio,
-                    "Comm/Round_Total_Raw_MB": round_raw_total / (1024 * 1024),
-                    "Comm/Round_Total_Upload_MB": round_packed_total / (1024 * 1024),
-                    "Comm/Round_Saved_Percent": 100.0 * (1.0 - round_packed_total / max(round_raw_total, 1)),
-                    **layer_log
-                }, step=epoch)
-                    
+                            local_deltas[param_key].append(local_state_dict[param_key] - global_state_dict[param_key])        
 
             if self.args.multiprocessing:
                 for _ in range(len(selected_client_ids)):
@@ -422,7 +371,8 @@ class Trainer():
                         
             updated_global_state_dict  = self.server.aggregate(local_weights, local_deltas,
                                                             selected_client_ids, copy.deepcopy(global_state_dict), current_lr, 
-                                                            epoch=epoch if self.args.server.get('AnalizeServer') else None)
+                                                            epoch=epoch if self.args.server.get('AnalizeServer') else None,
+                                                            local_compressed=local_compressed if use_qjl else None,)
             # if not use_loo:
             #     fedavg_weights, grad_var = updated_global_state_dict
             #     self.model.load_state_dict(fedavg_weights, strict=True)

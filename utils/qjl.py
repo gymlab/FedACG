@@ -12,14 +12,14 @@ class LayerWiseQJL:
     def __init__(
         self,
         device="cuda",
-        qjl_ratio=1.0,
-        use_orthogonal=False,
+        qjl_ratio=0.5,
+        use_orthogonal=True,
         seed=0,
         skip_small_tensors=True,
         small_tensor_threshold=256,
-        block_size=2048,              # 핵심 추가
-        min_m=32,                     # 너무 작은 m 방지
-        max_m=256,                    # m 상한
+        block_size=2048,
+        min_m=32,
+        max_m=256,
     ):
         self.device = torch.device(device)
         self.qjl_ratio = qjl_ratio
@@ -29,7 +29,6 @@ class LayerWiseQJL:
         self.sqrt_pi_2 = math.sqrt(math.pi / 2.0)
         self.skip_small_tensors = skip_small_tensors
         self.small_tensor_threshold = small_tensor_threshold
-
         self.block_size = block_size
         self.min_m = min_m
         self.max_m = max_m
@@ -45,100 +44,111 @@ class LayerWiseQJL:
         g.manual_seed(local_seed)
 
         if self.use_orthogonal:
-            # block-wise에서만 제한적으로 사용 권장
             A = torch.randn(m, d, generator=g, device=self.device, dtype=dtype)
-            Q, _ = torch.linalg.qr(A.t())   # [d, m]
-            S = Q.t()                       # [m, d]
+            Q, _ = torch.linalg.qr(A.t())
+            S = Q.t() * math.sqrt(d)
         else:
             S = torch.randn(m, d, generator=g, device=self.device, dtype=dtype)
 
         return S
 
-    def get_projection(self, cache_key_prefix: str, d: int, dtype=torch.float32):
+    def get_projection(self, cache_key: str, d: int, dtype=torch.float32):
         m = self._resolve_m(d)
-        cache_key = (cache_key_prefix, d, m, str(dtype), str(self.device))
-
-        if cache_key not in self.S_cache:
-            self.S_cache[cache_key] = self._build_projection(d, m, cache_key_prefix, dtype=dtype)
-
-        return self.S_cache[cache_key], m
+        key = (cache_key, d, m, str(dtype), str(self.device))
+        if key not in self.S_cache:
+            self.S_cache[key] = self._build_projection(d, m, cache_key, dtype=dtype)
+        return self.S_cache[key], m
 
     def _split_blocks(self, x: torch.Tensor):
-        blocks = []
         n = x.numel()
         for start in range(0, n, self.block_size):
             end = min(start + self.block_size, n)
-            blocks.append((start, end, x[start:end]))
-        return blocks
+            yield start, end, x[start:end]
 
-    def compress(self, param_key: str, delta: torch.Tensor):
+    def compress_for_similarity(self, param_key: str, delta: torch.Tensor):
+        """
+        유사도 추정용: sign bits + norm만 반환
+        실제 delta는 별도로 raw 전송
+        """
         d = delta.numel()
 
         if self.skip_small_tensors and d <= self.small_tensor_threshold:
-            return ("raw", delta.detach().clone(), delta.shape)
+            return None  # 작은 레이어는 유사도 추정 스킵
 
         delta_flat = delta.reshape(-1).to(self.device, dtype=torch.float32)
-        blocks = self._split_blocks(delta_flat)
+        blocks = []
 
-        packed_blocks = []
-        for block_idx, (start, end, block) in enumerate(blocks):
+        for block_idx, (start, end, block) in enumerate(self._split_blocks(delta_flat)):
             d_block = block.numel()
             block_key = f"{param_key}_block{block_idx}"
-
-            S, m = self.get_projection(block_key, d_block, dtype=torch.float32)
+            S, m = self.get_projection(block_key, d_block)
 
             projected = torch.matmul(S, block)
+            sign_bits = (projected >= 0).cpu().numpy().astype(np.bool_)
+            packed_uint8 = np.packbits(sign_bits, bitorder="little")
+            norm_val = torch.norm(block, p=2).item()
 
-            sign_bits_np = (projected >= 0).detach().cpu().numpy().astype(np.bool_)
-            packed_uint8_np = np.packbits(sign_bits_np, bitorder="little")
-
-            norm_val = torch.norm(block, p=2).detach().cpu()
-
-            packed_blocks.append({
+            blocks.append({
                 "start": start,
                 "end": end,
                 "d_block": d_block,
                 "m_block": m,
-                "packed_sign": torch.from_numpy(packed_uint8_np).to(torch.uint8),
-                "norm_val": norm_val,
+                "packed_sign": torch.from_numpy(packed_uint8).to(torch.uint8),
+                "norm": norm_val,
             })
 
-        return ("qjl_block", packed_blocks, delta.shape, d)
+        return blocks  # None이 아니면 유사도 추정 가능
 
-    def decompress(self, param_key: str, packed):
-        mode = packed[0]
+    def estimate_inner_product(self, param_key: str, query: torch.Tensor, compressed_blocks):
+        """
+        ProdQJL(query, delta) 추정
+        query: 서버의 g_global (raw)
+        compressed_blocks: 클라이언트가 보낸 sign bits + norm
+        """
+        if compressed_blocks is None:
+            return None
 
-        if mode == "raw":
-            _, tensor, orig_shape = packed
-            return tensor.reshape(orig_shape)
+        query_flat = query.reshape(-1).to(self.device, dtype=torch.float32)
+        total_ip = 0.0
+        total_m = 0
 
-        elif mode == "qjl_block":
-            _, packed_blocks, orig_shape, d_total = packed
+        for block_idx, block_info in enumerate(compressed_blocks):
+            start = block_info["start"]
+            end = block_info["end"]
+            d_block = block_info["d_block"]
+            m_block = block_info["m_block"]
+            norm_val = block_info["norm"]
 
-            reconstructed_flat = torch.zeros(
-                d_total, device=self.device, dtype=torch.float32
-            )
+            block_key = f"{param_key}_block{block_idx}"
+            S, _ = self.get_projection(block_key, d_block)
 
-            for block_idx, block_info in enumerate(packed_blocks):
-                start = block_info["start"]
-                end = block_info["end"]
-                d_block = block_info["d_block"]
-                m_block = block_info["m_block"]
-                packed_tensor = block_info["packed_sign"]
+            # query block에 S 적용
+            query_block = query_flat[start:end]
+            Sq = torch.matmul(S, query_block)  # [m]
 
-                packed_np = packed_tensor.detach().cpu().numpy()
-                unpacked_bits = np.unpackbits(packed_np, bitorder="little")[:m_block]
+            # sign bits 복원
+            packed_np = block_info["packed_sign"].cpu().numpy()
+            unpacked = np.unpackbits(packed_np, bitorder="little")[:m_block]
+            sign_vec = torch.from_numpy(unpacked).to(self.device, dtype=torch.float32)
+            sign_vec = sign_vec.mul_(2.0).sub_(1.0)
 
-                sign_vec_np = (unpacked_bits.astype(np.float32) * 2.0) - 1.0
-                sign_vec = torch.from_numpy(sign_vec_np).to(self.device, dtype=torch.float32)
+            # ProdQJL = (√π/2 / m) * norm * <Sq, sign(Sk)>
+            ip_block = self.sqrt_pi_2 / m_block * norm_val * torch.dot(Sq, sign_vec).item()
+            total_ip += ip_block
+            # total_m += 1
 
-                norm_val = block_info["norm_val"].to(self.device, dtype=torch.float32)
-
-                block_key = f"{param_key}_block{block_idx}"
-                S, _ = self.get_projection(block_key, d_block, dtype=torch.float32)
-
-                coeff = self.sqrt_pi_2 / m_block
-                block_rec = coeff * norm_val * torch.matmul(S.t(), sign_vec)
-                reconstructed_flat[start:end] = block_rec
-
-            return reconstructed_flat.reshape(orig_shape)
+        # return total_ip / total_m  # 블록별 평균
+        return total_ip
+    
+def build_qjl_helper(args, device):
+    return LayerWiseQJL(
+        device=device,
+        qjl_ratio=getattr(args.server, "qjl_ratio", 1.0),
+        use_orthogonal=getattr(args.server, "use_orthogonal", True),
+        seed=getattr(args, "seed", 0),
+        skip_small_tensors=getattr(args.server, "skip_small_tensors", True),
+        small_tensor_threshold=getattr(args.server, "small_tensor_threshold", 256),
+        block_size=getattr(args.server, "block_size", 2048),
+        min_m=getattr(args.server, "min_m", 32),
+        max_m=getattr(args.server, "max_m", 256),
+    )
